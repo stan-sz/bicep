@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.2" />
+    <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.5" />
     <PackageReference Include="CommandLineParser" Version="2.8.0" />
   </ItemGroup>
 
