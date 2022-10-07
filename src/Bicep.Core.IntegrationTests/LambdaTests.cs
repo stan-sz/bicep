@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 using System.Diagnostics.CodeAnalysis;
 using Bicep.Core.Diagnostics;
-using Bicep.Core.UnitTests;
 using Bicep.Core.UnitTests.Assertions;
 using Bicep.Core.UnitTests.Utils;
 using FluentAssertions;
@@ -15,38 +14,6 @@ namespace Bicep.Core.IntegrationTests
     {
         [NotNull]
         public TestContext? TestContext { get; set; }
-
-        [TestMethod]
-        public void Lambdas_cannot_be_used_with_feature_disabled()
-        {
-            var features = BicepTestConstants.Features with { AdvancedListComprehensionEnabled = false };
-            var context = new CompilationHelper.CompilationHelperContext(Features: features);
-
-            CompilationHelper.Compile(context, "var foo = map([123], i => i)")
-                .ExcludingLinterDiagnostics().Should().HaveDiagnostics(new [] {
-                    ("BCP082", DiagnosticLevel.Error, "The name \"map\" does not exist in the current context. Did you mean \"max\"?"),
-                });
-
-            CompilationHelper.Compile(context, "var foo = filter([123], i => true)")
-                .ExcludingLinterDiagnostics().Should().HaveDiagnostics(new [] {
-                    ("BCP057", DiagnosticLevel.Error, "The name \"filter\" does not exist in the current context."),
-                });
-
-            CompilationHelper.Compile(context, "var foo = sort([123], (x, y) => x < y)")
-                .ExcludingLinterDiagnostics().Should().HaveDiagnostics(new [] {
-                    ("BCP057", DiagnosticLevel.Error, "The name \"sort\" does not exist in the current context."),
-                });
-
-            CompilationHelper.Compile(context, "var foo = reduce([123], 1, (x, y) => x + y)")
-                .ExcludingLinterDiagnostics().Should().HaveDiagnostics(new [] {
-                    ("BCP057", DiagnosticLevel.Error, "The name \"reduce\" does not exist in the current context."),
-                });
-
-            CompilationHelper.Compile(context, "var foo = flatten([123], i => i)")
-                .ExcludingLinterDiagnostics().Should().HaveDiagnostics(new [] {
-                    ("BCP057", DiagnosticLevel.Error, "The name \"flatten\" does not exist in the current context."),
-                });
-        }
 
         [TestMethod]
         public void Parentheses_without_arrow_are_not_interpreted_as_lambdas()
@@ -148,10 +115,10 @@ var fo|o2 = map(['abc', 'def'], a|bc => length(abc))
             var info = result.GetInfoAtCursors(cursors);
 
             info.Should().SatisfyRespectively(
-                x => x.Type.Name.Should().Be("string[]"),
-                x => x.Type.Name.Should().Be("string"),
+                x => x.Type.Name.Should().Be("('abc' | 'def')[]"),
+                x => x.Type.Name.Should().Be("'abc' | 'def'"),
                 x => x.Type.Name.Should().Be("int[]"),
-                x => x.Type.Name.Should().Be("string"));
+                x => x.Type.Name.Should().Be("'abc' | 'def'"));
         }
 
         [TestMethod]
@@ -227,8 +194,8 @@ var fo|o2 = filter(['abc', 'def'], a|bc => abc == '123')
             info.Should().SatisfyRespectively(
                 x => x.Type.Name.Should().Be("int[]"),
                 x => x.Type.Name.Should().Be("int"),
-                x => x.Type.Name.Should().Be("string[]"),
-                x => x.Type.Name.Should().Be("string"));
+                x => x.Type.Name.Should().Be("('abc' | 'def')[]"),
+                x => x.Type.Name.Should().Be("'abc' | 'def'"));
         }
 
         [TestMethod]
@@ -246,8 +213,8 @@ var fo|o2 = sort(['bar', 'foo'], (abc, def) => abc < d|ef)
             info.Should().SatisfyRespectively(
                 x => x.Type.Name.Should().Be("int[]"),
                 x => x.Type.Name.Should().Be("int"),
-                x => x.Type.Name.Should().Be("string[]"),
-                x => x.Type.Name.Should().Be("string"));
+                x => x.Type.Name.Should().Be("('bar' | 'foo')[]"),
+                x => x.Type.Name.Should().Be("'bar' | 'foo'"));
         }
 
         [TestMethod]
@@ -266,7 +233,7 @@ var fo|o2 = reduce(['abc', 'def'], '', (cur, nex|t) => concat(cur, next))
                 x => x.Type.Name.Should().Be("int"),
                 x => x.Type.Name.Should().Be("int"),
                 x => x.Type.Name.Should().Be("string"),
-                x => x.Type.Name.Should().Be("string"));
+                x => x.Type.Name.Should().Be("'abc' | 'def'"));
         }
 
         [TestMethod]
@@ -305,6 +272,82 @@ var abc = map(
                             "lambda('d', map(" +
                                 "split(lambdaVariables('d'), ','), " +
                                 "lambda('e', format('Hello {0}', lambdaVariables('e'))))))))))))]");
+        }
+
+        [TestMethod]
+        public void Lambda_functions_cannot_be_used_to_dynamically_access_resource_collections()
+        {
+            var result = CompilationHelper.Compile(@"
+param ids array
+resource stg 'Microsoft.Storage/storageAccounts@2021-09-01' = [for i in range(0, 2): {
+  name: 'antteststg${i}'
+  location: 'West US'
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+}]
+
+output stgKeys array = map(range(0, 2), i => stg[i].listKeys().keys[0].value)
+output stgKeys2 array = map(range(0, 2), j => stg[((j + 2) % 123)].listKeys().keys[0].value)
+output stgKeys3 array = map(ids, id => listKeys(id, stg[0].apiVersion).keys[0].value)
+output accessTiers array = map(range(0, 2), k => stg[k].properties.accessTier)
+output accessTiers2 array = map(range(0, 2), x => map(range(0, 2), y => stg[x / y].properties.accessTier))
+output accessTiers3 array = map(ids, foo => reference('${foo}').accessTier)
+");
+
+            result.ExcludingLinterDiagnostics().Should().HaveDiagnostics(new [] {
+                ("BCP247", DiagnosticLevel.Error, "Using lambda variables inside resource or module array access is not currently supported. Found the following lambda variable(s) being accessed: \"i\"."),
+                ("BCP247", DiagnosticLevel.Error, "Using lambda variables inside resource or module array access is not currently supported. Found the following lambda variable(s) being accessed: \"j\"."),
+                ("BCP248", DiagnosticLevel.Error, "Using lambda variables inside the \"listKeys\" function is not currently supported. Found the following lambda variable(s) being accessed: \"id\"."),
+                ("BCP247", DiagnosticLevel.Error, "Using lambda variables inside resource or module array access is not currently supported. Found the following lambda variable(s) being accessed: \"k\"."),
+                ("BCP247", DiagnosticLevel.Error, "Using lambda variables inside resource or module array access is not currently supported. Found the following lambda variable(s) being accessed: \"x\", \"y\"."),
+                ("BCP248", DiagnosticLevel.Error, "Using lambda variables inside the \"reference\" function is not currently supported. Found the following lambda variable(s) being accessed: \"foo\"."),
+            });
+        }
+
+        [TestMethod]
+        public void Lambda_functions_cannot_be_used_to_dynamically_access_module_collections()
+        {
+            var result = CompilationHelper.Compile(
+                ("main.bicep", @"
+module myMod './module.bicep' = [for i in range(0, 2): {
+  name: 'myMod${i}'
+}]
+
+output modOutputs array = map(range(0, 2), i => myMod[i].outputs.foo)"),
+                ("module.bicep", @"
+output foo string = 'HELLO!'
+"));
+
+            result.ExcludingLinterDiagnostics().Should().HaveDiagnostics(new [] {
+                ("BCP247", DiagnosticLevel.Error, "Using lambda variables inside resource or module array access is not currently supported. Found the following lambda variable(s) being accessed: \"i\"."),
+            });
+        }
+
+        [TestMethod]
+        public void DeployTimeConstant_detection_works_with_lambdas()
+        {
+            var result = CompilationHelper.Compile(@"
+resource stg 'Microsoft.Storage/storageAccounts@2021-09-01' existing = {
+  name: 'blah'
+}
+
+var nonDtcArr = map(range(0, 1), i => stg.properties.accessTier)
+
+resource stg2 'Microsoft.Storage/storageAccounts@2021-09-01' = {
+  name: 'foo${nonDtcArr[0]}'
+  location: 'West US'
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+}
+");
+
+            result.ExcludingLinterDiagnostics().Should().HaveDiagnostics(new [] {
+                ("BCP120", DiagnosticLevel.Error, "This expression is being used in an assignment to the \"name\" property of the \"Microsoft.Storage/storageAccounts\" type, which requires a value that can be calculated at the start of the deployment. You are referencing a variable which cannot be calculated at the start (\"nonDtcArr\" -> \"stg\"). Properties of stg which can be calculated at the start include \"apiVersion\", \"id\", \"name\", \"type\"."),
+            });
         }
     }
 }

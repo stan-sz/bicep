@@ -11,12 +11,15 @@ using Bicep.Core.UnitTests.Utils;
 using FluentAssertions;
 using FluentAssertions.Execution;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Newtonsoft.Json.Linq;
 
 namespace Bicep.Core.IntegrationTests
 {
     [TestClass]
     public class DecoratorTests
     {
+        private static ServiceBuilder Services => new ServiceBuilder().WithEmptyAzResources();
+
         [TestMethod]
         public void ParameterDecorator_MissingDeclaration_ExpectedParameterDeclaration()
         {
@@ -77,7 +80,7 @@ param inputb string
 ",
             };
 
-            var compilation = new Compilation(BicepTestConstants.Features, TestTypeHelper.CreateEmptyProvider(), SourceFileGroupingFactory.CreateForFiles(files, mainUri, BicepTestConstants.FileResolver, BicepTestConstants.BuiltInConfiguration), BicepTestConstants.BuiltInConfiguration, BicepTestConstants.LinterAnalyzer);
+            var compilation = Services.BuildCompilation(files, mainUri);
             var diagnosticsByFile = compilation.GetAllDiagnosticsByBicepFile().ToDictionary(kvp => kvp.Key.FileUri, kvp => kvp.Value);
             var success = diagnosticsByFile.Values.SelectMany(x => x).All(d => d.Level != DiagnosticLevel.Error);
 
@@ -90,6 +93,40 @@ param inputb string
                     ("BCP129", DiagnosticLevel.Error, "Function \"minValue\" cannot be used as an output decorator."),
                 });
                 success.Should().BeFalse();
+            }
+        }
+
+        [TestMethod]
+        public void MetadataDecorator_AttachedToOutputDeclaration_CanBeUsed()
+        {
+            var (template, diagnostics, _) = CompilationHelper.Compile(@"
+@metadata({
+  some: 'sample-metadata'
+})
+output test bool = true
+");
+            using (new AssertionScope())
+            {
+                template.Should().HaveValueAtPath("outputs.test.metadata.some", new JValue("sample-metadata"));
+                diagnostics.ExcludingLinterDiagnostics().Should().BeEmpty();
+            }
+        }
+
+        [TestMethod]
+        public void MetadataDecorator_AttachedToOutputDeclaration_IsMergedWithDescriptionDecorator()
+        {
+            var (template, diagnostics, _) = CompilationHelper.Compile(@"
+@metadata({
+  some: 'sample-metadata'
+})
+@description('this is some helpful text, which is compiled into in the metadata object')
+output test bool = true
+");
+            using (new AssertionScope())
+            {
+                template.Should().HaveValueAtPath("outputs.test.metadata.some", new JValue("sample-metadata"));
+                template.Should().HaveValueAtPath("outputs.test.metadata.description", new JValue("this is some helpful text, which is compiled into in the metadata object"));
+                diagnostics.ExcludingLinterDiagnostics().Should().BeEmpty();
             }
         }
 
@@ -157,7 +194,7 @@ param inputb string
 ",
             };
 
-            var compilation = new Compilation(BicepTestConstants.Features, TestTypeHelper.CreateEmptyProvider(), SourceFileGroupingFactory.CreateForFiles(files, mainUri, BicepTestConstants.FileResolver, BicepTestConstants.BuiltInConfiguration), BicepTestConstants.BuiltInConfiguration, BicepTestConstants.LinterAnalyzer);
+            var compilation = Services.BuildCompilation(files, mainUri);
             var diagnosticsByFile = compilation.GetAllDiagnosticsByBicepFile().ToDictionary(kvp => kvp.Key.FileUri, kvp => kvp.Value);
             var success = diagnosticsByFile.Values.SelectMany(x => x).All(d => d.Level != DiagnosticLevel.Error);
 
@@ -175,5 +212,3 @@ param inputb string
         }
     }
 }
-
-

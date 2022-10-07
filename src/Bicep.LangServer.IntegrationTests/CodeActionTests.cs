@@ -6,6 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Bicep.Core;
 using Bicep.Core.CodeAction;
 using Bicep.Core.CodeAction.Fixes;
 using Bicep.Core.Diagnostics;
@@ -38,6 +39,8 @@ namespace Bicep.LangServer.IntegrationTests
     [TestClass]
     public class CodeActionTests
     {
+        private static ServiceBuilder Services => new ServiceBuilder();
+
         private const string SecureTitle = "Add @secure";
         private const string DescriptionTitle = "Add @description";
         private const string AllowedTitle = "Add @allowed";
@@ -45,8 +48,9 @@ namespace Bicep.LangServer.IntegrationTests
         private const string MaxLengthTitle = "Add @maxLength";
         private const string MinValueTitle = "Add @minValue";
         private const string MaxValueTitle = "Add @maxValue";
-        private const string RemoveUnusedVariableTitle = "Remove unused variable";
+        private const string RemoveUnusedExistingResourceTitle = "Remove unused existing resource";
         private const string RemoveUnusedParameterTitle = "Remove unused parameter";
+        private const string RemoveUnusedVariableTitle = "Remove unused variable";
 
         private static readonly SharedLanguageHelperManager DefaultServer = new();
 
@@ -64,7 +68,7 @@ namespace Bicep.LangServer.IntegrationTests
         {
             DefaultServer.Initialize(async () => await MultiFileLanguageServerHelper.StartLanguageServer(testContext));
 
-            ServerWithFileResolver.Initialize(async () => await MultiFileLanguageServerHelper.StartLanguageServer(testContext, new Server.CreationOptions(FileResolver: new FileResolver())));
+            ServerWithFileResolver.Initialize(async () => await MultiFileLanguageServerHelper.StartLanguageServer(testContext, new Server.CreationOptions(FileResolver: BicepTestConstants.FileResolver)));
 
             ServerWithBuiltInTypes.Initialize(async () => await MultiFileLanguageServerHelper.StartLanguageServer(testContext, new Server.CreationOptions(NamespaceProvider: BuiltInTestTypes.Create())));
 
@@ -235,7 +239,7 @@ namespace Bicep.LangServer.IntegrationTests
             var bicepConfigUri = DocumentUri.FromFileSystemPath(bicepConfigFilePath);
             fileSystemDict[bicepConfigUri.ToUri()] = bicepConfigFileContents;
 
-            var compilation = new Compilation(BicepTestConstants.Features, BicepTestConstants.NamespaceProvider, SourceFileGroupingFactory.CreateForFiles(fileSystemDict, uri, BicepTestConstants.FileResolver, BicepTestConstants.BuiltInConfiguration), BicepTestConstants.BuiltInConfiguration, BicepTestConstants.LinterAnalyzer);
+            var compilation = Services.BuildCompilation(fileSystemDict, uri);
             var diagnostics = compilation.GetEntrypointSemanticModel().GetAllDiagnostics();
 
             diagnostics.Should().HaveCount(1);
@@ -274,7 +278,7 @@ resource test";
                 [uri] = bicepFileContents,
             };
 
-            var compilation = new Compilation(BicepTestConstants.Features, BicepTestConstants.NamespaceProvider, SourceFileGroupingFactory.CreateForFiles(files, uri, BicepTestConstants.FileResolver, BicepTestConstants.BuiltInConfiguration), BicepTestConstants.BuiltInConfiguration, BicepTestConstants.LinterAnalyzer);
+            var compilation = Services.BuildCompilation(files, uri);
             var diagnostics = compilation.GetEntrypointSemanticModel().GetAllDiagnostics();
 
             diagnostics.Should().HaveCount(2);
@@ -336,7 +340,7 @@ resource vm 'Microsoft.Compute/virtualMachines@2020-12-01' = {
                 [uri] = bicepFileContents,
             };
 
-            var compilation = new Compilation(BicepTestConstants.Features, BicepTestConstants.NamespaceProvider, SourceFileGroupingFactory.CreateForFiles(files, uri, BicepTestConstants.FileResolver, BicepTestConstants.BuiltInConfiguration), BicepTestConstants.BuiltInConfiguration, BicepTestConstants.LinterAnalyzer);
+            var compilation = Services.BuildCompilation(files, uri);
             var diagnostics = compilation.GetEntrypointSemanticModel().GetAllDiagnostics();
 
             diagnostics.Should().HaveCount(3);
@@ -464,6 +468,38 @@ param foo {type}
             codeActions.Should().NotContain(x => x.Title == title);
         }
 
+        [DataRow(
+            @"resource ap|p 'Microsoft.Web/sites@2021-03-01' existing = {
+                name: 'app'
+            }",
+            "")]
+        [DataRow(
+            @"resource ap|p 'Microsoft.Web/sites@2021-03-01' existing = {
+                name: 'app'
+            }
+var foo = 'foo'",
+            "var foo = 'foo'")]
+        [DataRow(
+            @"resource app1 'Microsoft.Web/sites@2021-03-01' = {
+                name: 'app1'
+            }
+resource ap|p2 'Microsoft.Web/sites@2021-03-01' existing = {
+                name: 'app2'
+            }",
+            @"resource app1 'Microsoft.Web/sites@2021-03-01' = {
+                name: 'app1'
+            }
+")]
+        [DataTestMethod]
+        public async Task Unused_existing_resource_actions_are_suggested(string fileWithCursors, string expectedText)
+        {
+            (var codeActions, var bicepFile) = await RunSyntaxTest(fileWithCursors);
+            codeActions.Should().Contain(x => x.Title.StartsWith(RemoveUnusedExistingResourceTitle));
+            codeActions.First(x => x.Title.StartsWith(RemoveUnusedExistingResourceTitle)).Kind.Should().Be(CodeActionKind.QuickFix);
+
+            var updatedFile = ApplyCodeAction(bicepFile, codeActions.Single(x => x.Title.StartsWith(RemoveUnusedExistingResourceTitle)));
+            updatedFile.Should().HaveSourceText(expectedText);
+        }
 
         [DataRow(@"var fo|o = 'foo'
 var foo2 = 'foo2'", "var foo2 = 'foo2'")]

@@ -119,6 +119,23 @@ namespace Bicep.Core.Syntax
         }
         void ISyntaxVisitor.VisitSeparatedSyntaxList(SeparatedSyntaxList syntax) => ReplaceCurrent(syntax, ReplaceSeparatedSyntaxList);
 
+        protected virtual SyntaxBase ReplaceMetadataDeclarationSyntax(MetadataDeclarationSyntax syntax)
+        {
+            var hasChanges = TryRewrite(syntax.LeadingNodes, out var leadingNodes);
+            hasChanges |= TryRewriteStrict(syntax.Keyword, out var keyword);
+            hasChanges |= TryRewriteStrict(syntax.Name, out var name);
+            hasChanges |= TryRewrite(syntax.Assignment, out var assignment);
+            hasChanges |= TryRewrite(syntax.Value, out var value);
+
+            if (!hasChanges)
+            {
+                return syntax;
+            }
+
+            return new MetadataDeclarationSyntax(leadingNodes, keyword, name, assignment, value);
+        }
+        void ISyntaxVisitor.VisitMetadataDeclarationSyntax(MetadataDeclarationSyntax syntax) => ReplaceCurrent(syntax, ReplaceMetadataDeclarationSyntax);
+
         protected virtual SyntaxBase ReplaceParameterDeclarationSyntax(ParameterDeclarationSyntax syntax)
         {
             var hasChanges = TryRewrite(syntax.LeadingNodes, out var leadingNodes);
@@ -150,6 +167,36 @@ namespace Bicep.Core.Syntax
         }
         void ISyntaxVisitor.VisitParameterDefaultValueSyntax(ParameterDefaultValueSyntax syntax) => ReplaceCurrent(syntax, ReplaceParameterDefaultValueSyntax);
 
+        protected virtual SyntaxBase VisitParameterAssignmentSyntax(ParameterAssignmentSyntax syntax)
+        {
+            var hasChanges = TryRewriteStrict(syntax.Keyword, out var keyword);
+            hasChanges |= TryRewriteStrict(syntax.Name, out var name);
+            hasChanges |= TryRewriteStrict(syntax.Assignment, out var assignment);
+            hasChanges |= TryRewriteStrict(syntax.Value, out var value);
+
+            if (!hasChanges)
+            {
+                return syntax;
+            }
+
+            return new ParameterAssignmentSyntax(keyword, name, assignment, value);
+        }
+        void ISyntaxVisitor.VisitParameterAssignmentSyntax(ParameterAssignmentSyntax syntax) => ReplaceCurrent(syntax, VisitParameterAssignmentSyntax);
+
+        protected virtual SyntaxBase VisitUsingDeclarationSyntax(UsingDeclarationSyntax syntax)
+        {
+            var hasChanges = TryRewriteStrict(syntax.Keyword, out var keyword);
+            hasChanges |= TryRewriteStrict(syntax.Path, out var path);
+
+            if (!hasChanges)
+            {
+                return syntax;
+            }
+
+            return new UsingDeclarationSyntax(keyword, path);
+        }
+        void ISyntaxVisitor.VisitUsingDeclarationSyntax(UsingDeclarationSyntax syntax) => ReplaceCurrent(syntax, VisitUsingDeclarationSyntax);
+        
         protected virtual SyntaxBase ReplaceVariableDeclarationSyntax(VariableDeclarationSyntax syntax)
         {
             var hasChanges = TryRewriteStrict(syntax.Keyword, out var keyword);
@@ -264,7 +311,7 @@ namespace Bicep.Core.Syntax
                 return syntax;
             }
 
-            return new ImportDeclarationSyntax(leadingNodes, keyword, aliasName, asKeyword, providerName, config);
+            return new ImportDeclarationSyntax(leadingNodes, keyword, providerName, asKeyword, aliasName, config);
         }
         void ISyntaxVisitor.VisitImportDeclarationSyntax(ImportDeclarationSyntax syntax) => ReplaceCurrent(syntax, ReplaceImportDeclarationSyntax);
 
@@ -655,24 +702,6 @@ namespace Bicep.Core.Syntax
         }
 
         void ISyntaxVisitor.VisitForSyntax(ForSyntax syntax) => ReplaceCurrent(syntax, ReplaceForSyntax);
-
-        protected virtual SyntaxBase ReplaceForVariableBlockSyntax(ForVariableBlockSyntax syntax)
-        {
-            var hasChanges = TryRewriteStrict(syntax.OpenParen, out var openParen);
-            hasChanges |= TryRewriteStrict(syntax.ItemVariable, out var itemVariable);
-            hasChanges |= TryRewrite(syntax.Comma, out var comma);
-            hasChanges |= TryRewriteStrict(syntax.IndexVariable, out var indexVariable);
-            hasChanges |= TryRewrite(syntax.CloseParen, out var closeParen);
-
-            if (!hasChanges)
-            {
-                return syntax;
-            }
-
-            return new ForVariableBlockSyntax(openParen, itemVariable, comma, indexVariable, closeParen);
-        }
-
-        void ISyntaxVisitor.VisitForVariableBlockSyntax(ForVariableBlockSyntax syntax) => ReplaceCurrent(syntax, ReplaceForVariableBlockSyntax);
 
         protected virtual SyntaxBase ReplaceVariableBlockSyntax(VariableBlockSyntax syntax)
         {

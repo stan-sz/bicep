@@ -34,6 +34,7 @@ namespace Bicep.LangServer.UnitTests.Handlers
         private static readonly LinterRulesProvider linterRulesProvider = new();
 
         [TestMethod]
+        [Ignore("Disabled due to flakiness - https://github.com/Azure/bicep/issues/7370")]
         public async Task ChangingLinterRuleDiagnosticLevel_ShouldFireTelemetryEvent()
         {
             var prevBicepConfigFileContents = @"{
@@ -123,6 +124,7 @@ namespace Bicep.LangServer.UnitTests.Handlers
         }
 
         [TestMethod]
+        [Ignore("Disabled due to flakiness - https://github.com/Azure/bicep/issues/7370")]
         public async Task ChangingLinterRuleDiagnosticLevel_ToDefaultValue_ShouldNotFireTelemetryEvent()
         {
             var prevBicepConfigFileContents = @"{
@@ -161,6 +163,7 @@ namespace Bicep.LangServer.UnitTests.Handlers
         }
 
         [TestMethod]
+        [Ignore("Disabled due to flakiness - https://github.com/Azure/bicep/issues/7370")]
         public async Task ChangingLinterRuleDiagnosticLevel_WithOverallStateSetToFalse_ShouldNotFireTelemetryEvent()
         {
             var prevBicepConfigFileContents = @"{

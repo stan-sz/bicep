@@ -36,16 +36,6 @@ namespace Bicep.Core.TypeSystem
 
         public TypeSymbol? GetDeclaredType(SyntaxBase syntax) => this.GetDeclaredTypeAssignment(syntax)?.Reference.Type;
 
-        private DeclaredTypeAssignment? GetParentTypeAssignment(SyntaxBase syntax)
-        {
-            if (binder.GetParent(syntax) is {} parent)
-            {
-                return GetTypeAssignment(parent);
-            }
-
-            return null;
-        }
-
         private DeclaredTypeAssignment? GetTypeAssignment(SyntaxBase syntax)
         {
             RuntimeHelpers.EnsureSufficientExecutionStack();
@@ -54,6 +44,9 @@ namespace Bicep.Core.TypeSystem
             {
                 case ImportDeclarationSyntax import:
                     return GetImportType(import);
+                
+                case MetadataDeclarationSyntax metadata:
+                    return new DeclaredTypeAssignment(this.typeManager.GetTypeInfo(metadata.Value), metadata);
 
                 case ParameterDeclarationSyntax parameter:
                     return GetParameterType(parameter);
@@ -115,19 +108,8 @@ namespace Bicep.Core.TypeSystem
                 case FunctionArgumentSyntax functionArgument:
                     return GetFunctionArgumentType(functionArgument);
 
-                case ParenthesizedExpressionSyntax:
-                case TernaryOperationSyntax:
-                    return GetParentTypeAssignment(syntax);
-            }
-
-            var parent = binder.GetParent(syntax);
-            switch (parent)
-            {
-                // These expressions do not modify the declared type - we can get more accurate validation by checking the parent declared type
                 case ParenthesizedExpressionSyntax parenthesizedExpression:
-                    return GetTypeAssignment(parent);
-                case TernaryOperationSyntax ternary when (syntax == ternary.TrueExpression || syntax == ternary.FalseExpression):
-                    return GetTypeAssignment(parent);
+                    return GetTypeAssignment(parenthesizedExpression.Expression);
             }
 
             return null;
@@ -935,12 +917,12 @@ namespace Bicep.Core.TypeSystem
                     throw new InvalidOperationException($"qualifiedTypeReference is null");
                 }
 
-                if (binder.NamespaceResolver.TryGetResourceType(typeReference, typeGenerationFlags) is { } resourceType)
-                {
-                    return resourceType;
-                }
-
-                return ErrorType.Create(DiagnosticBuilder.ForPosition(span).InvalidResourceType());
+                var resourceTypes = binder.NamespaceResolver.GetMatchingResourceTypes(typeReference, typeGenerationFlags);
+                return resourceTypes.Length switch {
+                    0 => ErrorType.Create( DiagnosticBuilder.ForPosition(span).InvalidResourceType()),
+                    1 => resourceTypes[0],
+                    _ => ErrorType.Create(DiagnosticBuilder.ForPosition(span).AmbiguousResourceTypeBetweenImports(typeReference.FormatName(), resourceTypes.Select(x => x.DeclaringNamespace.Name))),
+                };
             }
         }
 

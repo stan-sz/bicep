@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Bicep.Core.Extensions;
+using Bicep.Core.Features;
 using Bicep.Core.Resources;
 using Bicep.Core.Syntax;
 using Bicep.Core.TypeSystem;
@@ -21,7 +22,7 @@ namespace Bicep.Core.Semantics.Namespaces
             this.BuiltIns = builtIns;
         }
 
-        public static NamespaceResolver Create(INamespaceProvider namespaceProvider, ResourceScope targetScope, IEnumerable<ImportedNamespaceSymbol> importedNamespaces)
+        public static NamespaceResolver Create(IFeatureProvider features, INamespaceProvider namespaceProvider, ResourceScope targetScope, IEnumerable<ImportedNamespaceSymbol> importedNamespaces)
         {
             var builtInNamespaceSymbols = new Dictionary<string, BuiltInNamespaceSymbol>(LanguageConstants.IdentifierComparer);
             var namespaceTypes = importedNamespaces
@@ -37,7 +38,7 @@ namespace Bicep.Core.Semantics.Namespaces
                     return;
                 }
 
-                if (namespaceProvider.TryGetNamespace(@namespace, @namespace, targetScope) is not { } namespaceType)
+                if (namespaceProvider.TryGetNamespace(@namespace, @namespace, targetScope, features) is not { } namespaceType)
                 {
                     // this namespace doesn't match a known built-in namespace
                     return;
@@ -80,6 +81,11 @@ namespace Bicep.Core.Semantics.Namespaces
             }
         }
 
+        public IEnumerable<FunctionSymbol> GetKnownFunctions(string functionName)
+            => this.namespaceTypes.Values
+                .Select(type => type.MethodResolver.TryGetFunctionSymbol(functionName))
+                .OfType<FunctionSymbol>();
+
         public IEnumerable<string> GetKnownFunctionNames(bool includeDecorators)
             => this.namespaceTypes.Values
                 .SelectMany(type => includeDecorators
@@ -95,23 +101,24 @@ namespace Bicep.Core.Semantics.Namespaces
         public NamespaceType? TryGetNamespace(string name)
             => this.namespaceTypes.TryGetValue(name);
 
-        public ResourceType? TryGetResourceType(ResourceTypeReference typeReference, ResourceTypeGenerationFlags flags)
+        public ImmutableArray<ResourceType> GetMatchingResourceTypes(ResourceTypeReference typeReference, ResourceTypeGenerationFlags flags)
         {
-            // TODO should we return an array of matching types here?
             var definedTypes = namespaceTypes.Values
                 .Select(type => type.ResourceTypeProvider.TryGetDefinedType(type, typeReference, flags))
-                .WhereNotNull();
+                .WhereNotNull()
+                .ToImmutableArray();
 
-            if (definedTypes.FirstOrDefault() is { } definedType)
+            if (definedTypes.Any())
             {
-                return definedType;
+                return definedTypes;
             }
 
-            var generatedTypes = namespaceTypes.Values
+            var fallbackTypes = namespaceTypes.Values
                 .Select(type => type.ResourceTypeProvider.TryGenerateFallbackType(type, typeReference, flags))
-                .WhereNotNull();
+                .WhereNotNull()
+                .ToImmutableArray();
 
-            return generatedTypes.FirstOrDefault();
+            return fallbackTypes;
         }
 
         public IEnumerable<ResourceTypeReference> GetAvailableResourceTypes()

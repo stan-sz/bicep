@@ -1,39 +1,34 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using Bicep.Core.Extensions;
 using Bicep.Core.Features;
 using Bicep.Core.TypeSystem;
 using Bicep.Core.TypeSystem.Az;
 
-namespace Bicep.Core.Semantics.Namespaces
+namespace Bicep.Core.Semantics.Namespaces;
+
+public class DefaultNamespaceProvider : INamespaceProvider
 {
-    public class DefaultNamespaceProvider : INamespaceProvider
+    private delegate NamespaceType GetNamespaceDelegate(string aliasName, ResourceScope resourceScope, IFeatureProvider features);
+    private readonly ImmutableDictionary<string, GetNamespaceDelegate> providerLookup;
+
+    public DefaultNamespaceProvider(IAzResourceTypeLoader azResourceTypeLoader)
     {
-        private readonly AzResourceTypeProvider azResourceTypeProvider;
-        private readonly IFeatureProvider featureProvider;
-
-        public DefaultNamespaceProvider(IAzResourceTypeLoader azResourceTypeLoader, IFeatureProvider featureProvider)
+        var azResourceTypeProvider = new AzResourceTypeProvider(azResourceTypeLoader);
+        this.providerLookup = new Dictionary<string, GetNamespaceDelegate>
         {
-            this.azResourceTypeProvider = new AzResourceTypeProvider(azResourceTypeLoader);
-            this.featureProvider = featureProvider;
-        }
-
-        public NamespaceType? TryGetNamespace(string providerName, string aliasName, ResourceScope resourceScope)
-        {
-            switch (providerName)
-            {
-                case SystemNamespaceType.BuiltInName:
-                    return SystemNamespaceType.Create(aliasName, featureProvider);
-                case AzNamespaceType.BuiltInName:
-                    return AzNamespaceType.Create(aliasName, resourceScope, azResourceTypeProvider);
-                case K8sNamespaceType.BuiltInName:
-                    return K8sNamespaceType.Create(aliasName);
-            }
-
-            return null;
-        }
-
-        public bool AllowImportStatements
-            => featureProvider.ImportsEnabled;
+            [SystemNamespaceType.BuiltInName] = (alias, scope, features) => SystemNamespaceType.Create(alias, features),
+            [AzNamespaceType.BuiltInName] = (alias, scope, features) => AzNamespaceType.Create(alias, scope, azResourceTypeProvider),
+            [K8sNamespaceType.BuiltInName] = (alias, scope, features) => K8sNamespaceType.Create(alias),
+        }.ToImmutableDictionary();
     }
+
+    public NamespaceType? TryGetNamespace(string providerName, string aliasName, ResourceScope resourceScope, IFeatureProvider features)
+        => providerLookup.TryGetValue(providerName)?.Invoke(aliasName, resourceScope, features);
+
+    public IEnumerable<string> AvailableNamespaces
+        => providerLookup.Keys;
 }

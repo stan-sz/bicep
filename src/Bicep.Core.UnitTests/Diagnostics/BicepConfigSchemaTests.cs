@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
@@ -27,7 +28,7 @@ namespace Bicep.Core.UnitTests.Diagnostics
 
         private (IBicepAnalyzerRule[] rules, JObject configSchema) GetRulesAndSchema()
         {
-            var linter = new LinterAnalyzer(BicepTestConstants.BuiltInConfiguration);
+            var linter = new LinterAnalyzer();
             var ruleSet = linter.GetRuleSet();
             ruleSet.Should().NotBeEmpty();
 
@@ -67,7 +68,7 @@ namespace Bicep.Core.UnitTests.Diagnostics
                                 ...
                             },
                             {
-                                "$ref": "#/definitions/rule"     **or**     "$ref": "#/definitions/rule-def-error-level"
+                                "$ref": "#/definitions/rule-def-level-{warning,error,off}"
                             }
                         ]
                     },
@@ -89,7 +90,7 @@ namespace Bicep.Core.UnitTests.Diagnostics
                 var lastAllOf = allOf[allOf.Count() - 1];
                 var refString = lastAllOf?.SelectToken("$ref")?.ToString();
                 Assert.IsNotNull(refString, "each rule's last allOf should be a ref to the definition of a rule");
-                refString.Should().MatchRegex("^#/definitions/(rule|rule-def-error-level)$", "each rule's last allOf should be a ref to the definition of a rule, either '#/definitions/rule' or '#/definitions/rule-def-error-level'");
+                refString.Should().MatchRegex("^#/definitions/rule-def-level-(warning|error|off)$", "each rule's last allOf should be a ref to the definition of a rule, one of '#/definitions/rule-def-level-warning', '#/definitions/rule-def-level-error' or '#/definitions/rule-def-error-off'");
             }
         }
 
@@ -118,7 +119,7 @@ namespace Bicep.Core.UnitTests.Diagnostics
                 string description = new Regex("^(.+) See https://.+").Match(descriptionWithLink)?.Groups[1].Value ?? "<couldn't find rule description>";
                 description.Should().MatchRegex("^[A-Z]", "all rule descriptions should start with a capital letter");
                 description.Should().EndWith(".", "all rule descriptions should end with a period");
-                description.Should().NotContainAny("Don't", "don't", "Do not", "do not"); // Use "Should" type of language generally (less impolite)
+                description.Should().NotContainAny(new[] { "don't", "do not" }, StringComparison.InvariantCultureIgnoreCase, "Use \"Should\" type of language generally (less impolite)");
                 description.Should().NotContain("\"", "use single quotes instead of double quotes in rule descriptions");
             }
         }
@@ -137,8 +138,7 @@ namespace Bicep.Core.UnitTests.Diagnostics
             string[] excludedHostsInSchema = ruleConfigs["no-hardcoded-env-urls"].SelectToken("allOf[0].properties.excludedhosts.default")!.Values().Select(v => v.ToString()).ToArray();
 
             // From config
-            ConfigurationManager sut = new ConfigurationManager(new IOFileSystem());
-            RootConfiguration builtinConfig = sut.GetBuiltInConfiguration();
+            RootConfiguration builtinConfig = IConfigurationManager.GetBuiltInConfiguration();
             string[]? disallowedHostsInConfig = builtinConfig.Analyzers.GetValue<string[]?>("core.rules.no-hardcoded-env-urls.disallowedhosts", null);
             disallowedHostsInConfig.Should().NotBeNull();
             string[]? excludedHostsInConfig = builtinConfig.Analyzers.GetValue<string[]?>("core.rules.no-hardcoded-env-urls.excludedhosts", null);

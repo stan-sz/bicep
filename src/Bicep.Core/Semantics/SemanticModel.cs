@@ -6,8 +6,11 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using Bicep.Core.Analyzers.Interfaces;
+using Bicep.Core.Analyzers.Linter.ApiVersions;
+using Bicep.Core.Configuration;
 using Bicep.Core.Diagnostics;
 using Bicep.Core.Emit;
+using Bicep.Core.Features;
 using Bicep.Core.FileSystem;
 using Bicep.Core.Semantics.Metadata;
 using Bicep.Core.Syntax;
@@ -30,12 +33,15 @@ namespace Bicep.Core.Semantics
         private readonly Lazy<ImmutableArray<DeclaredResourceMetadata>> declaredResourcesLazy;
         private readonly Lazy<ImmutableArray<IDiagnostic>> allDiagnostics;
 
-        public SemanticModel(Compilation compilation, BicepFile sourceFile, IFileResolver fileResolver, IBicepAnalyzer linterAnalyzer)
+        public SemanticModel(Compilation compilation, BicepFile sourceFile, IFileResolver fileResolver, IBicepAnalyzer linterAnalyzer, RootConfiguration configuration, IFeatureProvider features, IApiVersionProvider apiVersionProvider)
         {
             Trace.WriteLine($"Building semantic model for {sourceFile.FileUri}");
 
             Compilation = compilation;
             SourceFile = sourceFile;
+            Configuration = configuration;
+            Features = features;
+            ApiVersionProvider = apiVersionProvider;
             FileResolver = fileResolver;
 
             // create this in locked mode by default
@@ -44,8 +50,8 @@ namespace Bicep.Core.Semantics
             var symbolContext = new SymbolContext(compilation, this);
             SymbolContext = symbolContext;
 
-            Binder = new Binder(compilation.NamespaceProvider, sourceFile, symbolContext);
-            TypeManager = new TypeManager(compilation.Features, Binder, fileResolver);
+            Binder = new Binder(compilation.NamespaceProvider, features, sourceFile, symbolContext);
+            TypeManager = new TypeManager(features, Binder, fileResolver);
 
             // name binding is done
             // allow type queries now
@@ -77,7 +83,7 @@ namespace Bicep.Core.Semantics
                 foreach (var param in this.Root.ParameterDeclarations.DistinctBy(p => p.Name))
                 {
                     var description = SemanticModelHelper.TryGetDescription(this, param.DeclaringParameter);
-                    var isRequired =  SyntaxHelper.TryGetDefaultValue(param.DeclaringParameter) == null;
+                    var isRequired = SyntaxHelper.TryGetDefaultValue(param.DeclaringParameter) == null;
                     if (param.Type is ResourceType resourceType)
                     {
                         // Resource type parameters are a special case, we need to convert to a dedicated
@@ -120,6 +126,12 @@ namespace Bicep.Core.Semantics
 
         public BicepFile SourceFile { get; }
 
+        public RootConfiguration Configuration { get; }
+
+        public IFeatureProvider Features { get; }
+
+        public IApiVersionProvider ApiVersionProvider { get; }
+
         public IBinder Binder { get; }
 
         public ISymbolContext SymbolContext { get; }
@@ -152,6 +164,18 @@ namespace Bicep.Core.Semantics
         /// Does not include parameters and outputs of modules.
         /// </summary>
         public ImmutableArray<DeclaredResourceMetadata> DeclaredResources => declaredResourcesLazy.Value;
+
+        /// <summary>
+        /// Gets all diagnostics raised by loading Bicep config for this template.
+        /// </summary>
+        private IEnumerable<IDiagnostic> GetConfigDiagnostics()
+        {
+            foreach (var builderFunc in Configuration.DiagnosticBuilders)
+            {
+                // This diagnostic does not correspond to any specific location in the template, so just use the first character span.
+                yield return builderFunc(DiagnosticBuilder.ForDocumentStart());
+            }
+        }
 
         /// <summary>
         /// Gets all the parser and lexer diagnostics unsorted. Does not include diagnostics from the semantic model.
@@ -203,7 +227,8 @@ namespace Bicep.Core.Semantics
 
         private ImmutableArray<IDiagnostic> AssembleDiagnostics()
         {
-            var diagnostics = GetParseDiagnostics()
+            var diagnostics = GetConfigDiagnostics()
+                .Concat(GetParseDiagnostics())
                 .Concat(GetSemanticDiagnostics())
                 .Concat(GetAnalyzerDiagnostics())
                 .OrderBy(diag => diag.Span.Position);
@@ -257,20 +282,23 @@ namespace Bicep.Core.Semantics
 
         /// <summary>
         /// Returns all syntax nodes that represent a reference to the specified symbol. This includes the definitions of the symbol as well.
-        /// Unusued declarations will return 1 result. Unused and undeclared symbols (functions, namespaces, for example) may return an empty list.
+        /// Unused declarations will return 1 result. Unused and undeclared symbols (functions, namespaces, for example) may return an empty list.
         /// </summary>
         /// <param name="symbol">The symbol</param>
         public IEnumerable<SyntaxBase> FindReferences(Symbol symbol)
-            => SyntaxAggregator.Aggregate(this.SourceFile.ProgramSyntax, new List<SyntaxBase>(), (accumulated, current) =>
-                {
-                    if (object.ReferenceEquals(symbol, this.GetSymbolInfo(current)))
-                    {
-                        accumulated.Add(current);
-                    }
+            => FindReferences(symbol, this.SourceFile.ProgramSyntax);
 
-                    return accumulated;
-                },
-                accumulated => accumulated);
+        /// <summary>
+        /// Returns all syntax nodes that represent a reference to the specified symbol in the given syntax tree.  This includes the definitions
+        /// of the symbol as well, if inside the given syntax tree.
+        /// </summary>
+        /// <param name="symbol">The symbol</param>
+        /// <param name="syntaxTree">The syntax tree to traverse</param>
+        public IEnumerable<SyntaxBase> FindReferences(Symbol symbol, SyntaxBase syntaxTree)
+            => SyntaxAggregator.Aggregate(syntaxTree, current =>
+            {
+                return object.ReferenceEquals(symbol, this.GetSymbolInfo(current));
+            });
 
         private ImmutableArray<ResourceMetadata> GetAllResourceMetadata()
         {

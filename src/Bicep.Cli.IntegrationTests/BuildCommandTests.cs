@@ -72,7 +72,7 @@ namespace Bicep.Cli.IntegrationTests
             await dataSet.PublishModulesToRegistryAsync(clientFactory, TestContext);
             var bicepFilePath = Path.Combine(outputDirectory, DataSet.TestFileMain);
 
-            var features = BicepTestConstants.CreateFeaturesProvider(TestContext, registryEnabled: dataSet.HasExternalModules);
+            var features = BicepTestConstants.CreateFeatureProvider(TestContext, registryEnabled: dataSet.HasExternalModules);
             var settings = new InvocationSettings(features, clientFactory, templateSpecRepositoryFactory);
             var (output, error, result) = await Bicep(settings, "build", bicepFilePath);
 
@@ -112,7 +112,7 @@ namespace Bicep.Cli.IntegrationTests
             await dataSet.PublishModulesToRegistryAsync(clientFactory, TestContext);
             var bicepFilePath = Path.Combine(outputDirectory, DataSet.TestFileMain);
 
-            var features = BicepTestConstants.CreateFeaturesProvider(TestContext, registryEnabled: dataSet.HasExternalModules);
+            var features = BicepTestConstants.CreateFeatureProvider(TestContext, registryEnabled: dataSet.HasExternalModules);
             var settings = new InvocationSettings(features, clientFactory, templateSpecRepositoryFactory);
 
             var (output, error, result) = await Bicep(settings, "build", "--stdout", bicepFilePath);
@@ -151,7 +151,7 @@ namespace Bicep.Cli.IntegrationTests
             await dataSet.PublishModulesToRegistryAsync(clientFactory, TestContext);
             var bicepFilePath = Path.Combine(outputDirectory, DataSet.TestFileMain);
 
-            var features = BicepTestConstants.CreateFeaturesProvider(TestContext, registryEnabled: dataSet.HasExternalModules);
+            var features = BicepTestConstants.CreateFeatureProvider(TestContext, registryEnabled: dataSet.HasExternalModules);
             var settings = new InvocationSettings(features, clientFactory, templateSpecRepositoryFactory);
 
             var (restoreOutput, restoreError, restoreResult) = await Bicep(settings, "restore", bicepFilePath);
@@ -184,6 +184,28 @@ namespace Bicep.Cli.IntegrationTests
                 actualLocation: compiledFilePath);
         }
 
+        [DataTestMethod]
+        [BaselineData_Bicepparam.TestData(Filter = BaselineData_Bicepparam.TestDataFilterType.ValidOnly)]
+        [TestCategory(BaselineHelper.BaselineTestCategory)]
+        public async Task Build_Valid_Params_File_Should_Succeed(BaselineData_Bicepparam baselineData)
+        {
+            var data = baselineData.GetData(TestContext);
+
+            var features = BicepTestConstants.CreateFeatureProvider(TestContext, paramsFilesEnabled: true);
+            var settings = new InvocationSettings(features, BicepTestConstants.ClientFactory, BicepTestConstants.TemplateSpecRepositoryFactory);
+
+            var (output, error, result) = await Bicep(settings, "build", data.Parameters.OutputFilePath);
+
+            using (new AssertionScope())
+            {
+                result.Should().Be(0);
+                output.Should().BeEmpty();
+                AssertNoErrors(error);
+            }
+
+            data.Compiled!.ShouldHaveExpectedJsonValue();
+        }
+
         [TestMethod]
         public async Task Build_Valid_SingleFile_WithDigestReference_ShouldSucceed()
         {
@@ -198,7 +220,7 @@ namespace Bicep.Cli.IntegrationTests
 
             var templateSpecRepositoryFactory = BicepTestConstants.TemplateSpecRepositoryFactory;
 
-            var settings = new InvocationSettings(BicepTestConstants.CreateFeaturesProvider(TestContext, registryEnabled: true), clientFactory.Object, BicepTestConstants.TemplateSpecRepositoryFactory);
+            var settings = new InvocationSettings(BicepTestConstants.CreateFeatureProvider(TestContext, registryEnabled: true), clientFactory.Object, BicepTestConstants.TemplateSpecRepositoryFactory);
 
             var tempDirectory = FileHelper.GetUniqueTestOutputPath(TestContext);
             Directory.CreateDirectory(tempDirectory);
@@ -272,6 +294,27 @@ module empty 'br:{registry}/{repository}@{digest}' = {{
             var defaultSettings = CreateDefaultSettings();
             var diagnostics = GetAllDiagnostics(bicepFilePath, defaultSettings.ClientFactory, defaultSettings.TemplateSpecRepositoryFactory);
             error.Should().ContainAll(diagnostics);
+        }
+
+        [DataTestMethod]
+        [BaselineData_Bicepparam.TestData(Filter = BaselineData_Bicepparam.TestDataFilterType.InvalidOnly)]
+        [TestCategory(BaselineHelper.BaselineTestCategory)]
+        public async Task Build_Invalid_Single_Params_File_ShouldFail_WithExpectedErrorMessage(BaselineData_Bicepparam baselineData)
+        {
+            var data = baselineData.GetData(TestContext);
+
+            var features = BicepTestConstants.CreateFeatureProvider(TestContext, paramsFilesEnabled: true);
+            var settings = new InvocationSettings(features, BicepTestConstants.ClientFactory, BicepTestConstants.TemplateSpecRepositoryFactory);
+            var diagnostics = GetAllParamDiagnostics(data.Parameters.OutputFilePath, BicepTestConstants.ClientFactory, BicepTestConstants.TemplateSpecRepositoryFactory);
+
+            var (output, error, result) = await Bicep(settings, "build", data.Parameters.OutputFilePath);
+
+            using (new AssertionScope())
+            {
+                result.Should().Be(1);
+                output.Should().BeEmpty();
+                error.Should().ContainAll(diagnostics);
+            }
         }
 
         [TestMethod]
@@ -372,7 +415,7 @@ output myOutput string = 'hello!'
 
             result.Should().Be(1);
             output.Should().BeEmpty();
-            error.Should().StartWith($"Failed to parse the contents of the Bicep configuration file \"{configurationPath}\" as valid JSON: \"The input does not contain any JSON tokens. Expected the input to start with a valid JSON token, when isFinalBlock is true. LineNumber: 0 | BytePositionInLine: 0.\".");
+            error.Should().StartWith($"{inputFile}(1,1) : Error BCP271: Failed to parse the contents of the Bicep configuration file \"{configurationPath}\" as valid JSON: \"The input does not contain any JSON tokens. Expected the input to start with a valid JSON token, when isFinalBlock is true. LineNumber: 0 | BytePositionInLine: 0.\".");
         }
 
         [TestMethod]
@@ -394,7 +437,7 @@ output myOutput string = 'hello!'
 
             result.Should().Be(1);
             output.Should().BeEmpty();
-            error.Should().StartWith($"Failed to parse the contents of the Bicep configuration file \"{configurationPath}\" as valid JSON: \"Expected depth to be zero at the end of the JSON payload. There is an open JSON object or array that should be closed. LineNumber: 8 | BytePositionInLine: 0.\".");
+            error.Should().StartWith($"{inputFile}(1,1) : Error BCP271: Failed to parse the contents of the Bicep configuration file \"{configurationPath}\" as valid JSON: \"Expected depth to be zero at the end of the JSON payload. There is an open JSON object or array that should be closed. LineNumber: 8 | BytePositionInLine: 0.\".");
         }
 
         [TestMethod]

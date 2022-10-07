@@ -320,9 +320,9 @@ namespace Bicep.Core.Emit
                     {
                         emitter.EmitProperty("provider", namespaceType.Settings.ArmTemplateProviderName);
                         emitter.EmitProperty("version", namespaceType.Settings.ArmTemplateProviderVersion);
-                        if (import.DeclaringImport.Config is { } config)
+                        if (import.DeclaringImport.Config is not SkippedTriviaSyntax)
                         {
-                            emitter.EmitProperty("config", config);
+                            emitter.EmitProperty("config", import.DeclaringImport.Config);
                         }
                     });
                 });
@@ -677,7 +677,7 @@ namespace Bicep.Core.Emit
                         var moduleWriter = TemplateWriterFactory.CreateTemplateWriter(moduleSemanticModel, this.settings);
                         var moduleBicepFile = (moduleSemanticModel as SemanticModel)?.SourceFile;
                         var moduleTextWriter = new StringWriter();
-                        var moduleJsonWriter = new SourceAwareJsonTextWriter(moduleTextWriter, moduleBicepFile);
+                        var moduleJsonWriter = new SourceAwareJsonTextWriter(this.context.SemanticModel.FileResolver, moduleTextWriter, moduleBicepFile);
 
                         moduleWriter.Write(moduleJsonWriter);
                         jsonWriter.AddNestedSourceMap(moduleJsonWriter.TrackingJsonWriter);
@@ -911,7 +911,7 @@ namespace Bicep.Core.Emit
             {
                 if (context.Settings.EnableSymbolicNames)
                 {
-                    emitter.EmitProperty("EXPERIMENTAL_WARNING", "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!");
+                    emitter.EmitProperty("_EXPERIMENTAL_WARNING", "Symbolic name support in ARM is experimental, and should be enabled for testing purposes only. Do not enable this setting for any production usage, or you may be unexpectedly broken at any time!");
                 }
 
                 jsonWriter.WritePropertyName("_generator");
@@ -921,6 +921,12 @@ namespace Bicep.Core.Emit
                     emitter.EmitProperty("version", this.context.Settings.AssemblyFileVersion);
                 }
                 jsonWriter.WriteEndObject();
+
+                foreach (var metadataSymbol in this.context.SemanticModel.Root.MetadataDeclarations)
+                {
+                    jsonWriter.WritePropertyName(metadataSymbol.Name);
+                    emitter.EmitExpression(metadataSymbol.Value);
+                }
             }
             jsonWriter.WriteEndObject();
         }

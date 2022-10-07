@@ -29,13 +29,7 @@ namespace Bicep.Core.Extensions
         {
             options ??= DefaultDeserializeOptions;
 
-            var bufferWriter = new ArrayBufferWriter<byte>();
-            using (var writer = new Utf8JsonWriter(bufferWriter))
-            {
-                element.WriteTo(writer);
-            }
-
-            return JsonSerializer.Deserialize<T>(bufferWriter.WrittenSpan, options) ??
+            return JsonSerializer.Deserialize<T>(element, options) ??
                 throw new JsonException($"Expected deserialized value of \"{element}\" to be non-null.");
         }
 
@@ -86,14 +80,9 @@ namespace Bicep.Core.Extensions
         public static JsonElement Patch(this JsonElement element, params PatchOperation[] operations)
         {
             var patch = new JsonPatch(operations);
-            var patchResult = patch.Apply(element);
+            var patched = patch.Apply(element);
 
-            if (patchResult.IsSuccess)
-            {
-                return patchResult.Result;
-            }
-
-            throw new InvalidOperationException(patchResult.Error);
+            return patched;
         }
 
         public static IEnumerable<JsonElement> Select(this JsonElement element, string jsonPathQuery)

@@ -16,10 +16,10 @@ namespace Bicep.Core.Emit
 
         private readonly EmitterSettings settings;
 
-        public TemplateEmitter(SemanticModel model, EmitterSettings settings)
+        public TemplateEmitter(SemanticModel model)
         {
             this.model = model;
-            this.settings = settings;
+            this.settings = new(model.Features);
         }
 
         /// <summary>
@@ -49,7 +49,7 @@ namespace Bicep.Core.Emit
         /// <param name="existingContent">Existing content of the parameters file</param>
         public EmitResult EmitParametersFile(JsonTextWriter writer, string existingContent) => this.EmitOrFail(() =>
         {
-            new ParametersFileTemplateWriter(this.model, this.settings).Write(writer, existingContent);
+            new PlaceholderParametersJsonWriter(this.model, this.settings).Write(writer, existingContent);
         });
 
         /// <summary>
@@ -59,7 +59,7 @@ namespace Bicep.Core.Emit
         public EmitResult Emit(Stream stream) => EmitOrFail(() =>
         {
             var sourceFileToTrack = this.settings.EnableSourceMapping ? this.model.SourceFile : default;
-            using var writer = new SourceAwareJsonTextWriter(new StreamWriter(stream, UTF8EncodingWithoutBom, 4096, leaveOpen: true), sourceFileToTrack)
+            using var writer = new SourceAwareJsonTextWriter(this.model.FileResolver, new StreamWriter(stream, UTF8EncodingWithoutBom, 4096, leaveOpen: true), sourceFileToTrack)
             {
                 Formatting = Formatting.Indented
             };
@@ -69,7 +69,6 @@ namespace Bicep.Core.Emit
 
             return writer.SourceMap;
         });
-
         /// <summary>
         /// Emits a template to the specified text writer if there are no errors. No writes are made to the writer if there are compilation errors.
         /// </summary>
@@ -77,7 +76,7 @@ namespace Bicep.Core.Emit
         public EmitResult Emit(TextWriter textWriter) => EmitOrFail(() =>
         {
             var sourceFileToTrack = this.settings.EnableSourceMapping ? this.model.SourceFile : default;
-            using var writer = new SourceAwareJsonTextWriter(textWriter, sourceFileToTrack)
+            using var writer = new SourceAwareJsonTextWriter(this.model.FileResolver, textWriter, sourceFileToTrack)
             {
                 // don't close the textWriter when writer is disposed
                 CloseOutput = false,

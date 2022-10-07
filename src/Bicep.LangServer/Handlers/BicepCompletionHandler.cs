@@ -21,27 +21,29 @@ namespace Bicep.LanguageServer.Handlers
         private readonly ILogger<BicepCompletionHandler> logger;
         private readonly ICompilationManager compilationManager;
         private readonly ICompletionProvider completionProvider;
-        private readonly IFeatureProvider featureProvider;
+        private readonly IFeatureProviderFactory featureProviderFactory;
 
-        public BicepCompletionHandler(ILogger<BicepCompletionHandler> logger, ICompilationManager compilationManager, ICompletionProvider completionProvider, IFeatureProvider featureProvider)
+        public BicepCompletionHandler(ILogger<BicepCompletionHandler> logger, ICompilationManager compilationManager, ICompletionProvider completionProvider, IFeatureProviderFactory featureProviderFactory)
         {
             this.logger = logger;
             this.compilationManager = compilationManager;
             this.completionProvider = completionProvider;
-            this.featureProvider = featureProvider;
+            this.featureProviderFactory = featureProviderFactory;
         }
 
         public override Task<CompletionList> Handle(CompletionParams request, CancellationToken cancellationToken)
         {
+            var completions = Enumerable.Empty<CompletionItem>();
+
             var compilationContext = this.compilationManager.GetCompilation(request.TextDocument.Uri);
-            if (compilationContext == null)
+            if (compilationContext is null)
             {
                 return Task.FromResult(new CompletionList());
             }
 
             int offset = PositionHelper.GetOffset(compilationContext.LineStarts, request.Position);
-            var completionContext = BicepCompletionContext.Create(featureProvider, compilationContext.Compilation, offset);
-            var completions = Enumerable.Empty<CompletionItem>();
+            var completionContext = BicepCompletionContext.Create(featureProviderFactory.GetFeatureProvider(request.TextDocument.Uri.ToUri()), compilationContext.Compilation, offset);
+
             try
             {
                 completions = this.completionProvider.GetFilteredCompletions(compilationContext.Compilation, completionContext);

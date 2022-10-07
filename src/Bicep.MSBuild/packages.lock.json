@@ -2,6 +2,12 @@
   "version": 1,
   "dependencies": {
     ".NETStandard,Version=v2.0": {
+      "Azure.Deployments.Internal.GenerateNotice": {
+        "type": "Direct",
+        "requested": "[0.1.13, )",
+        "resolved": "0.1.13",
+        "contentHash": "l9bZLZxtzNF33jexI8o9IKUoxenIh9rqO96ApaZ0AoXhPe0OL7tJ+fwsNHIOk4f1Ysyq85+A0kbzef2wQLd9Cw=="
+      },
       "Microsoft.Build.Framework": {
         "type": "Direct",
         "requested": "[16.10.0, )",
@@ -44,9 +50,9 @@
       },
       "Nerdbank.GitVersioning": {
         "type": "Direct",
-        "requested": "[3.5.107, )",
-        "resolved": "3.5.107",
-        "contentHash": "oMWWTe9aTUJ1CwU4fpfpduqx7Hzve320PU2SUyFFDzlHXTdjEouWHtFrRbaXV4LysL0lBtlzJM/nmHm47p2KWw=="
+        "requested": "[3.5.113, )",
+        "resolved": "3.5.113",
+        "contentHash": "4fBSMkqhi410qlkjPm+Mxfk8iO3C7dmgdVS7ljsfVO21WEzZCHP1VCOqB6rlOPfPidR/oxX+/Do/I7meCAz+Jg=="
       },
       "NETStandard.Library": {
         "type": "Direct",

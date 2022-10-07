@@ -1,7 +1,9 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
+using Bicep.Core.Analyzers.Interfaces;
 using Bicep.Core.Analyzers.Linter;
+using Bicep.Core.Analyzers.Linter.ApiVersions;
 using Bicep.Core.Configuration;
 using Bicep.Core.Emit;
 using Bicep.Core.Features;
@@ -18,6 +20,7 @@ using Bicep.LanguageServer.Configuration;
 using Bicep.LanguageServer.Deploy;
 using Bicep.LanguageServer.Extensions;
 using Bicep.LanguageServer.Handlers;
+using Bicep.LanguageServer.ParamsHandlers;
 using Bicep.LanguageServer.Providers;
 using Bicep.LanguageServer.Registry;
 using Bicep.LanguageServer.Snippets;
@@ -42,7 +45,7 @@ namespace Bicep.LanguageServer
             ISnippetsProvider? SnippetsProvider = null,
             INamespaceProvider? NamespaceProvider = null,
             IFileResolver? FileResolver = null,
-            IFeatureProvider? Features = null,
+            IFeatureProviderFactory? FeatureProviderFactory = null,
             IModuleRestoreScheduler? ModuleRestoreScheduler = null,
             Action<IServiceCollection>? onRegisterServices = null);
 
@@ -71,6 +74,11 @@ namespace Bicep.LanguageServer
                     .WithHandler<BicepGetRecommendedConfigLocationHandler>()
                     .WithHandler<BicepSignatureHelpHandler>()
                     .WithHandler<BicepSemanticTokensHandler>()
+
+                    .WithHandler<BicepParamsTextDocumentSyncHandler>()
+                    .WithHandler<BicepParamsCompletionHandler>()
+                    .WithHandler<BicepParamsDefinitionHandler>()
+
                     .WithHandler<BicepTelemetryHandler>()
                     .WithHandler<BicepBuildCommandHandler>()
                     .WithHandler<BicepGenerateParamsCommandHandler>()
@@ -80,6 +88,7 @@ namespace Bicep.LanguageServer
                     .WithHandler<BicepDeploymentWaitForCompletionCommandHandler>(new JsonRpcHandlerOptions() { RequestProcessType = RequestProcessType.Parallel })
                     .WithHandler<BicepDeploymentScopeRequestHandler>()
                     .WithHandler<BicepDeploymentParametersHandler>()
+                    .WithHandler<ImportKubernetesManifestHandler>()
                     .WithHandler<BicepForceModulesRestoreCommandHandler>()
                     .WithHandler<BicepRegistryCacheRequestHandler>()
                     .WithHandler<InsertResourceHandler>()
@@ -119,14 +128,12 @@ namespace Bicep.LanguageServer
             services.AddSingletonOrInstance<INamespaceProvider, DefaultNamespaceProvider>(creationOptions.NamespaceProvider);
             services.AddSingletonOrInstance<ISnippetsProvider, SnippetsProvider>(creationOptions.SnippetsProvider);
             services.AddSingletonOrInstance<IFileResolver, FileResolver>(creationOptions.FileResolver);
-            services.AddSingletonOrInstance<IFeatureProvider, FeatureProvider>(creationOptions.Features);
-            services.AddSingleton<EmitterSettings>();
+            services.AddSingletonOrInstance<IFeatureProviderFactory, FeatureProviderFactory>(creationOptions.FeatureProviderFactory);
             services.AddSingleton<IModuleRegistryProvider, DefaultModuleRegistryProvider>();
             services.AddSingleton<IContainerRegistryClientFactory, ContainerRegistryClientFactory>();
             services.AddSingleton<ITemplateSpecRepositoryFactory, TemplateSpecRepositoryFactory>();
             services.AddSingleton<IModuleDispatcher, ModuleDispatcher>();
             services.AddSingleton<IFileSystem, FileSystem>();
-            services.AddSingleton<IConfigurationManager, ConfigurationManager>();
             services.AddSingleton<ITokenCredentialFactory, TokenCredentialFactory>();
             services.AddSingleton<ITelemetryProvider, TelemetryProvider>();
             services.AddSingleton<IWorkspace, Workspace>();
@@ -137,10 +144,15 @@ namespace Bicep.LanguageServer
             services.AddSingletonOrInstance<IModuleRestoreScheduler, ModuleRestoreScheduler>(creationOptions.ModuleRestoreScheduler);
             services.AddSingleton<IAzResourceProvider, AzResourceProvider>();
             services.AddSingleton<ILinterRulesProvider, LinterRulesProvider>();
+            services.AddSingleton<IConfigurationManager, ConfigurationManager>();
             services.AddSingleton<IBicepConfigChangeHandler, BicepConfigChangeHandler>();
             services.AddSingleton<IDeploymentCollectionProvider, DeploymentCollectionProvider>();
             services.AddSingleton<IDeploymentOperationsCache, DeploymentOperationsCache>();
             services.AddSingleton<IDeploymentFileCompilationCache, DeploymentFileCompilationCache>();
+            services.AddSingleton<IClientCapabilitiesProvider, ClientCapabilitiesProvider>();
+            services.AddSingleton<IApiVersionProviderFactory, ApiVersionProviderFactory>();
+            services.AddSingleton<IParamsCompilationManager, BicepParamsCompilationManager>();
+            services.AddSingleton<IBicepAnalyzer, LinterAnalyzer>();
         }
 
         public void Dispose()

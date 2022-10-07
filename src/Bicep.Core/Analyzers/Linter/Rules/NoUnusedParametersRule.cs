@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 using Bicep.Core.Diagnostics;
@@ -28,14 +28,13 @@ namespace Bicep.Core.Analyzers.Linter.Rules
 
         override public IEnumerable<IDiagnostic> AnalyzeInternal(SemanticModel model)
         {
-            // parameters must have at least two references
-            //  1) One reference will be the the paramater syntax declaration
-            //  2) VariableAccessSyntax indicates a reference to the parameter
+            var diagnosticLevel = GetDiagnosticLevel(model);
+            // VariableAccessSyntax indicates a reference to the parameter
             var unreferencedParams = model.Root.ParameterDeclarations
                 .Where(sym => !model.FindReferences(sym).OfType<VariableAccessSyntax>().Any())
                 .Where(sym => sym.NameSyntax.IsValid);
 
-            return unreferencedParams.Select(param => CreateRemoveUnusedDiagnosticForSpan(param.Name, param.NameSyntax, param.DeclaringSyntax, model.SourceFile.ProgramSyntax));
+            return unreferencedParams.Select(param => CreateRemoveUnusedDiagnosticForSpan(diagnosticLevel, param.Name, param.NameSyntax, param.DeclaringSyntax, model.SourceFile.ProgramSyntax));
         }
 
         override protected string GetCodeFixDescription(string name)

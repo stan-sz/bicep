@@ -21,7 +21,7 @@ module moduleWithoutPath = {
 //@[028:028) [BCP018 (Error)] Expected the "=" character at this location. (CodeDescription: none) ||
 
 }
-//@[000:001) [BCP007 (Error)] This declaration type is not recognized. Specify a parameter, variable, resource, or output declaration. (CodeDescription: none) |}|
+//@[000:001) [BCP007 (Error)] This declaration type is not recognized. Specify a metadata, parameter, variable, resource, or output declaration. (CodeDescription: none) |}|
 
 // #completionTest(41) -> moduleBodyCompletions
 module moduleWithPath './moduleb.bicep' =
@@ -403,12 +403,12 @@ module cwdFileCompletionC 'm'
 
 // #completionTest(24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39) -> childFileCompletions
 module childCompletionA 'ChildModules/'
-//@[024:039) [BCP091 (Error)] An error occurred reading file. Access to the path '${TEST_OUTPUT_DIR}/ChildModules/' is denied. (CodeDescription: none) |'ChildModules/'|
+//@[024:039) [BCP275 (Error)] Unable to open file at path "${TEST_OUTPUT_DIR}/ChildModules/". Found a directory instead. (CodeDescription: none) |'ChildModules/'|
 //@[039:039) [BCP018 (Error)] Expected the "=" character at this location. (CodeDescription: none) ||
 
 // #completionTest(24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39) -> childDotFileCompletions
 module childCompletionB './ChildModules/'
-//@[024:041) [BCP091 (Error)] An error occurred reading file. Access to the path '${TEST_OUTPUT_DIR}/ChildModules/' is denied. (CodeDescription: none) |'./ChildModules/'|
+//@[024:041) [BCP275 (Error)] Unable to open file at path "${TEST_OUTPUT_DIR}/ChildModules/". Found a directory instead. (CodeDescription: none) |'./ChildModules/'|
 //@[041:041) [BCP018 (Error)] Expected the "=" character at this location. (CodeDescription: none) ||
 
 // #completionTest(24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40) -> childDotFileCompletions
@@ -457,13 +457,13 @@ module expectedLoopBody 'modulea.bicep' = [for x in y:]
 
 // indexed loop parsing cases
 module expectedItemVarName 'modulea.bicep' = [for ()]
-//@[051:052) [BCP136 (Error)] Expected a loop item variable identifier at this location. (CodeDescription: none) |)|
+//@[050:052) [BCP249 (Error)] Expected loop variable block to consist of exactly 2 elements (item variable and index variable), but found 0. (CodeDescription: none) |()|
 
 module expectedComma 'modulea.bicep' = [for (x)]
-//@[046:047) [BCP018 (Error)] Expected the "," character at this location. (CodeDescription: none) |)|
+//@[044:047) [BCP249 (Error)] Expected loop variable block to consist of exactly 2 elements (item variable and index variable), but found 1. (CodeDescription: none) |(x)|
 
 module expectedIndexVarName 'modulea.bicep' = [for (x,)]
-//@[054:055) [BCP163 (Error)] Expected a loop index variable identifier at this location. (CodeDescription: none) |)|
+//@[051:055) [BCP249 (Error)] Expected loop variable block to consist of exactly 2 elements (item variable and index variable), but found 1. (CodeDescription: none) |(x,)|
 
 module expectedInKeyword3 'modulea.bicep' = [for (x,y)]
 //@[054:055) [BCP012 (Error)] Expected the "in" keyword at this location. (CodeDescription: none) |]|

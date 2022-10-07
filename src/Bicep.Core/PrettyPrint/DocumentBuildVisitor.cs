@@ -89,6 +89,17 @@ namespace Bicep.Core.PrettyPrint
                 this.Visit(syntax.Config);
             });
 
+        public override void VisitMetadataDeclarationSyntax(MetadataDeclarationSyntax syntax) =>
+            this.BuildStatement(syntax, () =>
+            {
+                this.VisitNodes(syntax.LeadingNodes);
+                this.Visit(syntax.Keyword);
+                this.documentStack.Push(Nil);
+                this.Visit(syntax.Name);
+                this.Visit(syntax.Assignment);
+                this.Visit(syntax.Value);
+            });
+
         public override void VisitParameterDeclarationSyntax(ParameterDeclarationSyntax syntax) =>
             this.BuildStatement(syntax, () =>
             {
@@ -148,6 +159,26 @@ namespace Bicep.Core.PrettyPrint
                 this.Visit(syntax.Value);
             });
 
+        public override void VisitParameterAssignmentSyntax(ParameterAssignmentSyntax syntax) =>
+            this.BuildStatement(syntax, () =>
+            {
+                this.VisitNodes(syntax.LeadingNodes);
+                this.Visit(syntax.Keyword);
+                this.documentStack.Push(Nil);
+                this.Visit(syntax.Name);
+                this.Visit(syntax.Assignment);
+                this.Visit(syntax.Value);
+            });
+
+        public override void VisitUsingDeclarationSyntax(UsingDeclarationSyntax syntax) =>
+            this.BuildStatement(syntax, () =>
+            {
+                this.VisitNodes(syntax.LeadingNodes);
+                this.Visit(syntax.Keyword);
+                this.documentStack.Push(Nil);
+                this.Visit(syntax.Path);
+            });
+
         public override void VisitTernaryOperationSyntax(TernaryOperationSyntax syntax) =>
             this.BuildWithSpread(() => base.VisitTernaryOperationSyntax(syntax));
 
@@ -188,20 +219,6 @@ namespace Bicep.Core.PrettyPrint
 
                 return Concat(openBracket, Spread(forKeyword, variableBlock, inKeyword, arrayExpression), Spread(colon, loopBody), closeBracket);
             });
-
-        public override void VisitForVariableBlockSyntax(ForVariableBlockSyntax syntax) =>
-            this.Build(() => base.VisitForVariableBlockSyntax(syntax), children =>
-             {
-                 Debug.Assert(children.Length == 5);
-
-                 ILinkedDocument openParen = children[0];
-                 ILinkedDocument itemVariable = children[1];
-                 ILinkedDocument comma = children[2];
-                 ILinkedDocument indexVariable = children[3];
-                 ILinkedDocument closeParen = children[4];
-
-                 return Spread(Concat(openParen, itemVariable, comma), Concat(indexVariable, closeParen));
-             });
 
         public override void VisitVariableBlockSyntax(VariableBlockSyntax syntax) =>
             this.BuildWithConcat(() => {

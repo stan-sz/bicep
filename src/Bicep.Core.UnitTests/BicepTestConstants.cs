@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using Bicep.Core.Analyzers.Linter;
+using Bicep.Core.Analyzers.Linter.ApiVersions;
 using Bicep.Core.Configuration;
 using Bicep.Core.Emit;
 using Bicep.Core.Extensions;
@@ -30,6 +31,7 @@ namespace Bicep.Core.UnitTests
         bool ImportsEnabled,
         bool AdvancedListComprehensionEnabled,
         bool ResourceTypedParamsAndOutputsEnabled,
+        bool ParamsFilesEnabled,
         bool SourceMappingEnabled) : IFeatureProvider;
 
     public static class BicepTestConstants
@@ -38,31 +40,48 @@ namespace Bicep.Core.UnitTests
 
         public const string GeneratorTemplateHashPath = "metadata._generator.templateHash";
 
-        public static readonly FileResolver FileResolver = new();
+        public static readonly FileResolver FileResolver = new(new IOFileSystem());
 
-        public static readonly TestFeatureProvider Features = CreateFeatureProvider(registryEnabled: false, symbolicNameCodegenEnabled: false, importsEnabled: false, resourceTypedParamsAndOutputsEnabled: false, sourceMappingEnabled: false, assemblyFileVersion: BicepTestConstants.DevAssemblyFileVersion);
+        public static readonly TestFeatureProvider Features = CreateFeatureProvider(registryEnabled: false, symbolicNameCodegenEnabled: false, importsEnabled: false, resourceTypedParamsAndOutputsEnabled: false, sourceMappingEnabled: false, paramsFilesEnabled: false, assemblyFileVersion: BicepTestConstants.DevAssemblyFileVersion);
+
+        public static readonly IFeatureProviderFactory FeatureProviderFactory = IFeatureProviderFactory.WithStaticFeatureProvider(Features);
 
         public static readonly EmitterSettings EmitterSettings = new EmitterSettings(Features);
 
         public static readonly IAzResourceTypeLoader AzResourceTypeLoader = new AzResourceTypeLoader();
 
-        public static readonly INamespaceProvider NamespaceProvider = TestTypeHelper.CreateWithAzTypes();
+        public static readonly INamespaceProvider NamespaceProvider = new DefaultNamespaceProvider(new AzResourceTypeLoader());
 
         public static readonly IContainerRegistryClientFactory ClientFactory = StrictMock.Of<IContainerRegistryClientFactory>().Object;
 
         public static readonly ITemplateSpecRepositoryFactory TemplateSpecRepositoryFactory = StrictMock.Of<ITemplateSpecRepositoryFactory>().Object;
 
-        public static readonly IModuleRegistryProvider RegistryProvider = new DefaultModuleRegistryProvider(FileResolver, ClientFactory, TemplateSpecRepositoryFactory, Features);
-
         public static readonly IConfigurationManager ConfigurationManager = new ConfigurationManager(new IOFileSystem());
 
-        public static readonly RootConfiguration BuiltInConfiguration = ConfigurationManager.GetBuiltInConfiguration();
+        // Linter rules added to this list will be automtically disabled for most tests.
+        public static readonly string[] AnalyzerRulesToDisableInTests = new string[] {
+            // use-recent-api-versions is problematic for tests but it's off by default so doesn't need to appear here
+        };
 
-        public static readonly LinterAnalyzer LinterAnalyzer = new LinterAnalyzer(BuiltInConfiguration);
+        public static readonly RootConfiguration BuiltInConfigurationWithAllAnalyzersEnabled = IConfigurationManager.GetBuiltInConfiguration();
+        public static readonly RootConfiguration BuiltInConfigurationWithAllAnalyzersDisabled = IConfigurationManager.GetBuiltInConfiguration().WithAllAnalyzersDisabled();
+        public static readonly RootConfiguration BuiltInConfigurationWithProblematicAnalyzersDisabled = IConfigurationManager.GetBuiltInConfiguration().WithAnalyzersDisabled(AnalyzerRulesToDisableInTests);
 
-        public static readonly RootConfiguration BuiltInConfigurationWithAnalyzersDisabled = ConfigurationManager.GetBuiltInConfiguration(disableAnalyzers: true);
+        // By default turns off only problematic analyzers
+        public static readonly RootConfiguration BuiltInConfiguration = BuiltInConfigurationWithProblematicAnalyzersDisabled;
+
+        public static readonly IConfigurationManager BuiltInOnlyConfigurationManager = IConfigurationManager.WithStaticConfiguration(BuiltInConfiguration);
+
+        public static readonly IModuleRegistryProvider RegistryProvider = new DefaultModuleRegistryProvider(FileResolver, ClientFactory, TemplateSpecRepositoryFactory, FeatureProviderFactory, BuiltInOnlyConfigurationManager);
+
+        public static readonly IModuleDispatcher ModuleDispatcher = new ModuleDispatcher(BicepTestConstants.RegistryProvider, IConfigurationManager.WithStaticConfiguration(BuiltInConfiguration));
+
+        // By default turns off only problematic analyzers
+        public static readonly LinterAnalyzer LinterAnalyzer = new LinterAnalyzer();
 
         public static readonly IModuleRestoreScheduler ModuleRestoreScheduler = CreateMockModuleRestoreScheduler();
+        public static readonly ApiVersionProvider ApiVersionProvider = new ApiVersionProvider(Features, new DefaultNamespaceProvider(new AzResourceTypeLoader()));
+        public static readonly IApiVersionProviderFactory ApiVersionProviderFactory = IApiVersionProviderFactory.WithStaticApiVersionProvider(ApiVersionProvider);
 
         public static RootConfiguration CreateMockConfiguration(Dictionary<string, object>? customConfigurationData = null, string? configurationPath = null)
         {
@@ -74,6 +93,7 @@ namespace Bicep.Core.UnitTests
                 ["cloud.credentialPrecedence"] = new[] { "AzureCLI", "AzurePowerShell" },
                 ["moduleAliases"] = new Dictionary<string, object>(),
                 ["analyzers"] = new Dictionary<string, object>(),
+                ["experimentalFeaturesEnabled"] = new Dictionary<string, bool>(),
             };
 
             if (customConfigurationData is not null)
@@ -94,13 +114,14 @@ namespace Bicep.Core.UnitTests
             return RootConfiguration.Bind(element, configurationPath);
         }
 
-        public static TestFeatureProvider CreateFeaturesProvider(
+        public static TestFeatureProvider CreateFeatureProvider(
             TestContext testContext,
             bool registryEnabled = false,
             bool symbolicNameCodegenEnabled = false,
             bool importsEnabled = false,
             bool resourceTypedParamsAndOutputsEnabled = false,
             bool sourceMappingEnabled = false,
+            bool paramsFilesEnabled = false,
             string assemblyFileVersion = DevAssemblyFileVersion)
         {
             var features = CreateFeatureProvider(
@@ -109,6 +130,7 @@ namespace Bicep.Core.UnitTests
                 importsEnabled,
                 resourceTypedParamsAndOutputsEnabled,
                 sourceMappingEnabled,
+                paramsFilesEnabled,
                 assemblyFileVersion);
 
             return features with
@@ -123,6 +145,7 @@ namespace Bicep.Core.UnitTests
             bool importsEnabled,
             bool resourceTypedParamsAndOutputsEnabled,
             bool sourceMappingEnabled,
+            bool paramsFilesEnabled,
             string assemblyFileVersion)
         {
             return new TestFeatureProvider(
@@ -133,6 +156,7 @@ namespace Bicep.Core.UnitTests
                 importsEnabled,
                 true,
                 resourceTypedParamsAndOutputsEnabled,
+                paramsFilesEnabled,
                 sourceMappingEnabled);
         }
 

@@ -37,6 +37,7 @@ namespace Bicep.Core.Analyzers.Linter.Rules
 
         public override IEnumerable<IDiagnostic> AnalyzeInternal(SemanticModel semanticModel)
         {
+            var diagnosticLevel = GetDiagnosticLevel(semanticModel);
             List<IDiagnostic> diagnostics = new();
 
             foreach (var resource in semanticModel.DeclaredResources.Where(r => r.IsAzResource))
@@ -81,10 +82,10 @@ namespace Bicep.Core.Analyzers.Linter.Rules
                                 if (matches)
                                 {
                                     // Does it contain any possible secrets?
-                                    var secrets = FindPossibleSecretsVisitor.FindPossibleSecrets(semanticModel, commandToExecuteSyntax.Value);
+                                    var secrets = FindPossibleSecretsVisitor.FindPossibleSecretsInExpression(semanticModel, commandToExecuteSyntax.Value);
                                     if (secrets.Any())
                                     {
-                                        diagnostics.Add(CreateDiagnosticForSpan(commandToExecuteSyntax.Key.Span, secrets[0].FoundMessage));
+                                        diagnostics.Add(CreateDiagnosticForSpan(diagnosticLevel, commandToExecuteSyntax.Key.Span, secrets[0].FoundMessage));
                                     }
                                 }
                             }
@@ -97,4 +98,3 @@ namespace Bicep.Core.Analyzers.Linter.Rules
         }
     }
 }
-

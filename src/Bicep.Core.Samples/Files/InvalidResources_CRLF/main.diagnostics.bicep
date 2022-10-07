@@ -1,7 +1,7 @@
 
 // wrong declaration
 bad
-//@[000:003) [BCP007 (Error)] This declaration type is not recognized. Specify a parameter, variable, resource, or output declaration. (CodeDescription: none) |bad|
+//@[000:003) [BCP007 (Error)] This declaration type is not recognized. Specify a metadata, parameter, variable, resource, or output declaration. (CodeDescription: none) |bad|
 
 // incomplete #completionTest(9) -> empty
 resource 
@@ -1518,16 +1518,16 @@ resource expectedLoopBody 'Microsoft.Storage/storageAccounts@2019-06-01' = [for 
 
 // loop index parsing cases
 resource expectedLoopItemName 'Microsoft.Network/dnsZones@2018-05-01' = [for ()]
-//@[078:079) [BCP136 (Error)] Expected a loop item variable identifier at this location. (CodeDescription: none) |)|
+//@[077:079) [BCP249 (Error)] Expected loop variable block to consist of exactly 2 elements (item variable and index variable), but found 0. (CodeDescription: none) |()|
 
 resource expectedLoopItemName2 'Microsoft.Network/dnsZones@2018-05-01' = [for (
-//@[079:079) [BCP136 (Error)] Expected a loop item variable identifier at this location. (CodeDescription: none) ||
+//@[079:079) [BCP009 (Error)] Expected a literal value, an array, an object, a parenthesized expression, or a function call at this location. (CodeDescription: none) ||
 
 resource expectedComma 'Microsoft.Network/dnsZones@2018-05-01' = [for (x)]
-//@[072:073) [BCP018 (Error)] Expected the "," character at this location. (CodeDescription: none) |)|
+//@[070:073) [BCP249 (Error)] Expected loop variable block to consist of exactly 2 elements (item variable and index variable), but found 1. (CodeDescription: none) |(x)|
 
 resource expectedLoopIndexName 'Microsoft.Network/dnsZones@2018-05-01' = [for (x, )]
-//@[082:083) [BCP163 (Error)] Expected a loop index variable identifier at this location. (CodeDescription: none) |)|
+//@[078:083) [BCP249 (Error)] Expected loop variable block to consist of exactly 2 elements (item variable and index variable), but found 1. (CodeDescription: none) |(x, )|
 
 resource expectedInKeyword3 'Microsoft.Network/dnsZones@2018-05-01' = [for (x, y)]
 //@[081:082) [BCP012 (Error)] Expected the "in" keyword at this location. (CodeDescription: none) |]|
@@ -1678,6 +1678,7 @@ resource propertyLoopsCannotNest 'Microsoft.Storage/storageAccounts@2019-06-01' 
     networkAcls: {
       virtualNetworkRules: [for rule in []: {
         id: '${account.name}-${account.location}'
+//@[008:010) [use-resource-id-functions (Warning)] If property "id" represents a resource ID, it must use a symbolic resource reference, be a parameter or start with one of these functions: extensionResourceId, guid, if, reference, resourceId, subscription, subscriptionResourceId, tenantResourceId. (CodeDescription: bicep core(https://aka.ms/bicep/linter/use-resource-id-functions)) |id|
         state: [for lol in []: 4]
 //@[016:019) [BCP142 (Error)] Property value for-expressions cannot be nested. (CodeDescription: none) |for|
       }]
@@ -1698,6 +1699,7 @@ resource propertyLoopsCannotNest2 'Microsoft.Storage/storageAccounts@2019-06-01'
     networkAcls: {
       virtualNetworkRules: [for (rule,j) in []: {
         id: '${account.name}-${account.location}'
+//@[008:010) [use-resource-id-functions (Warning)] If property "id" represents a resource ID, it must use a symbolic resource reference, be a parameter or start with one of these functions: extensionResourceId, guid, if, reference, resourceId, subscription, subscriptionResourceId, tenantResourceId. (CodeDescription: bicep core(https://aka.ms/bicep/linter/use-resource-id-functions)) |id|
         state: [for (lol,k) in []: 4]
 //@[016:019) [BCP142 (Error)] Property value for-expressions cannot be nested. (CodeDescription: none) |for|
       }]
@@ -1720,6 +1722,7 @@ resource propertyLoopsCannotNest2 'Microsoft.Storage/storageAccounts@2019-06-01'
       virtualNetworkRules: [for rule in []: {
         // #completionTest(15,31) -> symbolsPlusRule
         id: '${account.name}-${account.location}'
+//@[008:010) [use-resource-id-functions (Warning)] If property "id" represents a resource ID, it must use a symbolic resource reference, be a parameter or start with one of these functions: extensionResourceId, guid, if, reference, resourceId, subscription, subscriptionResourceId, tenantResourceId. (CodeDescription: bicep core(https://aka.ms/bicep/linter/use-resource-id-functions)) |id|
         state: [for state in []: {
 //@[016:019) [BCP142 (Error)] Property value for-expressions cannot be nested. (CodeDescription: none) |for|
           // #completionTest(38) -> empty #completionTest(16) -> symbolsPlusAccountRuleState
@@ -1745,6 +1748,7 @@ resource stuffs 'Microsoft.Storage/storageAccounts@2019-06-01' = [for account in
       virtualNetworkRules: concat([for lol in []: {
 //@[035:038) [BCP138 (Error)] For-expressions are not supported in this context. For-expressions may be used as values of resource, module, variable, and output declarations, or values of resource and module properties. (CodeDescription: none) |for|
         id: '${account.name}-${account.location}'
+//@[008:010) [use-resource-id-functions (Warning)] If property "id" represents a resource ID, it must use a symbolic resource reference, be a parameter or start with one of these functions: extensionResourceId, guid, if, reference, resourceId, subscription, subscriptionResourceId, tenantResourceId. (CodeDescription: bicep core(https://aka.ms/bicep/linter/use-resource-id-functions)) |id|
       }])
     }
   }
@@ -2051,6 +2055,7 @@ resource anyTypeInScopeConditional 'Microsoft.Authorization/locks@2016-09-01' = 
 }
 
 resource anyTypeInExistingScope 'Microsoft.Network/dnsZones/AAAA@2018-05-01' existing = {
+//@[009:031) [no-unused-existing-resources (Warning)] Existing resource "anyTypeInExistingScope" is declared but never used. (CodeDescription: bicep core(https://aka.ms/bicep/linter/no-unused-existing-resources)) |anyTypeInExistingScope|
 //@[009:031) [BCP035 (Error)] The specified "resource" declaration is missing the following required properties: "name". (CodeDescription: none) |anyTypeInExistingScope|
   parent: any('')
 //@[010:017) [BCP240 (Error)] The "parent" property only permits direct references to resources. Expressions are not supported. (CodeDescription: none) |any('')|
@@ -2060,6 +2065,7 @@ resource anyTypeInExistingScope 'Microsoft.Network/dnsZones/AAAA@2018-05-01' exi
 }
 
 resource anyTypeInExistingScopeLoop 'Microsoft.Network/dnsZones/AAAA@2018-05-01' existing = [for thing in []: {
+//@[009:035) [no-unused-existing-resources (Warning)] Existing resource "anyTypeInExistingScopeLoop" is declared but never used. (CodeDescription: bicep core(https://aka.ms/bicep/linter/no-unused-existing-resources)) |anyTypeInExistingScopeLoop|
 //@[009:035) [BCP035 (Error)] The specified "resource" declaration is missing the following required properties: "name". (CodeDescription: none) |anyTypeInExistingScopeLoop|
   parent: any('')
 //@[010:017) [BCP240 (Error)] The "parent" property only permits direct references to resources. Expressions are not supported. (CodeDescription: none) |any('')|

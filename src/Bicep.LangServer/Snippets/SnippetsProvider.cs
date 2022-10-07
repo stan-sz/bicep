@@ -11,13 +11,15 @@ using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using Bicep.Core;
-using Bicep.Core.Analyzers.Linter;
+using Bicep.Core.Analyzers.Interfaces;
+using Bicep.Core.Analyzers.Linter.ApiVersions;
 using Bicep.Core.Configuration;
-using Bicep.Core.Diagnostics;
 using Bicep.Core.Emit;
+using Bicep.Core.Extensions;
 using Bicep.Core.Features;
 using Bicep.Core.FileSystem;
 using Bicep.Core.Parsing;
+using Bicep.Core.Registry;
 using Bicep.Core.Resources;
 using Bicep.Core.Semantics;
 using Bicep.Core.Semantics.Namespaces;
@@ -48,13 +50,9 @@ namespace Bicep.LanguageServer.Snippets
         // The common properties should be authored consistently to provide for understandability and consumption of the code.
         // See https://github.com/Azure/azure-quickstart-templates/blob/master/1-CONTRIBUTION-GUIDE/best-practices.md#resources
         // for more information
-        private readonly List<string> propertiesSortPreferenceList = new()
-        {
-            "comments",
-            "condition",
+        private readonly ImmutableArray<string> propertiesSortPreferenceList = ImmutableArray.Create(
             "scope",
-            "type",
-            "apiVersion",
+            "parent",
             "name",
             "location",
             "zones",
@@ -63,26 +61,27 @@ namespace Bicep.LanguageServer.Snippets
             "scale",
             "plan",
             "identity",
-            "dependsOn",
             "tags",
-            "properties"
-        };
-        private readonly IFeatureProvider features;
+            "properties",
+            "dependsOn");
+
+        private readonly IFeatureProviderFactory featureProviderFactory;
+        private readonly IApiVersionProviderFactory apiVersionProviderFactory;
         private readonly INamespaceProvider namespaceProvider;
         private readonly IFileResolver fileResolver;
-        private readonly RootConfiguration configuration;
-        private readonly LinterAnalyzer linterAnalyzer;
+        private readonly IBicepAnalyzer bicepAnalyzer;
+        private readonly IConfigurationManager configurationManager;
+        private readonly IModuleDispatcher moduleDispatcher;
 
-        public SnippetsProvider(IFeatureProvider features, INamespaceProvider namespaceProvider, IFileResolver fileResolver, IConfigurationManager configurationManager)
+        public SnippetsProvider(IFeatureProviderFactory featureProviderFactory, INamespaceProvider namespaceProvider, IFileResolver fileResolver, IConfigurationManager configurationManager, IApiVersionProviderFactory apiVersionProviderFactory, IModuleDispatcher moduleDispatcher, IBicepAnalyzer bicepAnalyzer)
         {
-            this.features = features;
+            this.featureProviderFactory = featureProviderFactory;
+            this.apiVersionProviderFactory = apiVersionProviderFactory;
+            this.moduleDispatcher = moduleDispatcher;
             this.namespaceProvider = namespaceProvider;
             this.fileResolver = fileResolver;
-
-            // We'll use default bicepconfig.json settings during SnippetsProvider creation to avoid errors during language service initialization.
-            // We don't do any validation in SnippetsProvider. So using default settings shouldn't be a problem.
-            configuration = configurationManager.GetBuiltInConfiguration(disableAnalyzers: true);
-            linterAnalyzer = new LinterAnalyzer(configuration);
+            this.configurationManager = configurationManager;
+            this.bicepAnalyzer = bicepAnalyzer;
 
             Initialize();
         }
@@ -220,17 +219,13 @@ namespace Bicep.LanguageServer.Snippets
 
             // We need to provide uri for syntax tree creation, but it's not used anywhere. In order to avoid
             // cross platform issues, we'll provide a placeholder uri.
-            BicepFile bicepFile = SourceFileFactory.CreateBicepFile(new Uri($"inmemory://{manifestResourceName}.bicep"), template);
-            SourceFileGrouping sourceFileGrouping = new SourceFileGrouping(
-                fileResolver,
-                bicepFile,
-                ImmutableHashSet.Create<ISourceFile>(bicepFile),
-                ImmutableDictionary.Create<ModuleDeclarationSyntax, ISourceFile>(),
-                ImmutableDictionary.Create<ISourceFile, ImmutableHashSet<ISourceFile>>(),
-                ImmutableDictionary.Create<ModuleDeclarationSyntax, DiagnosticBuilder.ErrorBuilderDelegate>(),
-                ImmutableHashSet<ModuleDeclarationSyntax>.Empty);
+            var bicepFile = SourceFileFactory.CreateBicepFile(new Uri($"inmemory://{manifestResourceName}.bicep"), template);
+            var workspace = new Workspace();
+            workspace.UpsertSourceFiles(bicepFile.AsEnumerable());
 
-            Compilation compilation = new Compilation(this.features, namespaceProvider, sourceFileGrouping, configuration, linterAnalyzer);
+            var sourceFileGrouping = SourceFileGroupingBuilder.Build(fileResolver, moduleDispatcher, workspace, bicepFile.FileUri, false);
+
+            Compilation compilation = new Compilation(featureProviderFactory, namespaceProvider, sourceFileGrouping, configurationManager, apiVersionProviderFactory, bicepAnalyzer);
 
             SemanticModel semanticModel = compilation.GetEntrypointSemanticModel();
 
@@ -331,13 +326,15 @@ namespace Bicep.LanguageServer.Snippets
             int index = 1;
             StringBuilder sb = new StringBuilder();
 
-            IOrderedEnumerable<KeyValuePair<string, TypeProperty>> sortedProperties = objectType.Properties.OrderBy(x => propertiesSortPreferenceList.Exists(y => y == x.Key) ?
-                                                                                                 propertiesSortPreferenceList.FindIndex(y => y == x.Key) :
-                                                                                                 propertiesSortPreferenceList.Count - 1);
+            var sortedProperties = objectType.Properties.OrderBy(x => {
+                var index = propertiesSortPreferenceList.IndexOf(x.Key);
 
-            foreach (KeyValuePair<string, TypeProperty> kvp in sortedProperties)
+                return (index > -1) ? index : (propertiesSortPreferenceList.Length - 1);
+            });
+
+            foreach (var (key, value) in sortedProperties)
             {
-                string? snippetText = GetSnippetText(kvp.Value, indentLevel: 1, ref index, discriminatedObjectKey);
+                string? snippetText = GetSnippetText(value, indentLevel: 1, ref index, discriminatedObjectKey);
 
                 if (snippetText is not null)
                 {

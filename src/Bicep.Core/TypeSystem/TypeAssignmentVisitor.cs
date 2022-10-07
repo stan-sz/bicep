@@ -21,24 +21,6 @@ namespace Bicep.Core.TypeSystem
 {
     public sealed class TypeAssignmentVisitor : SyntaxVisitor
     {
-        private class TypeAssignment
-        {
-            public TypeAssignment(ITypeReference reference)
-                : this(reference, Enumerable.Empty<IDiagnostic>())
-            {
-            }
-
-            public TypeAssignment(ITypeReference reference, IEnumerable<IDiagnostic> diagnostics)
-            {
-                Reference = reference;
-                Diagnostics = diagnostics;
-            }
-
-            public ITypeReference Reference { get; }
-
-            public IEnumerable<IDiagnostic> Diagnostics { get; }
-        }
-
         private readonly IFeatureProvider features;
         private readonly ITypeManager typeManager;
         private readonly IBinder binder;
@@ -183,7 +165,7 @@ namespace Bicep.Core.TypeSystem
                         var @for = parent switch
                         {
                             ForSyntax forParent => forParent,
-                            ForVariableBlockSyntax block when this.binder.GetParent(block) is ForSyntax forParent => forParent,
+                            VariableBlockSyntax block when this.binder.GetParent(block) is ForSyntax forParent => forParent,
                             _ => throw new InvalidOperationException($"{syntax.GetType().Name} at {syntax.Span} has an unexpected parent of type {parent?.GetType().Name}")
                         };
 
@@ -468,7 +450,7 @@ namespace Bicep.Core.TypeSystem
 
                 this.ValidateDecorators(syntax.Decorators, namespaceType, diagnostics);
 
-                if (syntax.Config is not null)
+                if (syntax.Config is not SkippedTriviaSyntax)
                 {
                     if (namespaceType.ConfigurationType is null)
                     {
@@ -553,6 +535,30 @@ namespace Bicep.Core.TypeSystem
                 }
             }
         }
+
+        public override void VisitMetadataDeclarationSyntax(MetadataDeclarationSyntax syntax)
+            => AssignTypeWithDiagnostics(syntax, diagnostics =>
+            {
+                var errors = new List<ErrorDiagnostic>();
+
+                var valueType = typeManager.GetTypeInfo(syntax.Value);
+                CollectErrors(errors, valueType);
+
+                if (PropagateErrorType(errors, valueType))
+                {
+                    return ErrorType.Create(errors);
+                }
+
+                if (TypeValidator.AreTypesAssignable(valueType, LanguageConstants.Any) != true)
+                {
+                    return ErrorType.Create(DiagnosticBuilder.ForPosition(syntax.Value).VariableTypeAssignmentDisallowed(valueType));
+                }
+
+                ValidateDecorators(syntax.Decorators, valueType, diagnostics);
+                TypeValidator.GetCompileTimeConstantViolation(syntax.Value, diagnostics);
+
+                return valueType;
+            });
 
         public override void VisitVariableDeclarationSyntax(VariableDeclarationSyntax syntax)
             => AssignTypeWithDiagnostics(syntax, diagnostics =>
@@ -1083,6 +1089,13 @@ namespace Bicep.Core.TypeSystem
                     case FunctionSymbol function:
                         return GetFunctionSymbolType(function, syntax, errors, diagnostics);
 
+                    case Symbol symbolInfo when binder.NamespaceResolver.GetKnownFunctions(symbolInfo.Name).FirstOrDefault() is {} knownFunction:
+                        // A function exists, but it's being shadowed by another symbol in the file
+                        return ErrorType.Create(
+                            errors.Append(
+                                DiagnosticBuilder.ForPosition(syntax.Name.Span)
+                                .SymbolicNameShadowsAKnownFunction(syntax.Name.IdentifierName, knownFunction.DeclaringObject.Name, knownFunction.Name)));
+
                     default:
                         return ErrorType.Create(errors.Append(DiagnosticBuilder.ForPosition(syntax.Name.Span).SymbolicNameIsNotAFunction(syntax.Name.IdentifierName)));
                 }
@@ -1120,6 +1133,7 @@ namespace Bicep.Core.TypeSystem
 
             var functionFlags = binder.GetParent(decorator) switch
             {
+                MetadataDeclarationSyntax _ => FunctionFlags.MetadataDecorator,
                 ResourceDeclarationSyntax _ => FunctionFlags.ResourceDecorator,
                 ModuleDeclarationSyntax _ => FunctionFlags.ModuleDecorator,
                 ParameterDeclarationSyntax _ => FunctionFlags.ParameterDecorator,
@@ -1242,6 +1256,7 @@ namespace Bicep.Core.TypeSystem
 
                 return functionSymbol?.FunctionFlags switch
                 {
+                    FunctionFlags.MetadataDecorator => builder.ExpectedMetadataDeclarationAfterDecorator(),
                     FunctionFlags.ParameterDecorator => builder.ExpectedParameterDeclarationAfterDecorator(),
                     FunctionFlags.VariableDecorator => builder.ExpectedVariableDeclarationAfterDecorator(),
                     FunctionFlags.ResourceDecorator => builder.ExpectedResourceDeclarationAfterDecorator(),

@@ -4,6 +4,7 @@
 using Bicep.Core.Diagnostics;
 using Bicep.Core.Semantics;
 using Bicep.Core.Syntax;
+using Bicep.Core.Workspaces;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -27,7 +28,7 @@ namespace Bicep.Core.Analyzers.Linter.Rules
 
         public override IEnumerable<IDiagnostic> AnalyzeInternal(SemanticModel model)
         {
-            Visitor visitor = new(this, model);
+            Visitor visitor = new(this, model, GetDiagnosticLevel(model));
             visitor.Visit(model.SourceFile.ProgramSyntax);
             return visitor.diagnostics;
         }
@@ -36,20 +37,23 @@ namespace Bicep.Core.Analyzers.Linter.Rules
         {
             public List<IDiagnostic> diagnostics = new();
 
+            private readonly Dictionary<ISourceFile, ImmutableArray<ParameterSymbol>> _cachedParamsUsedInLocationPropsForFile = new();
             private readonly ExplicitValuesForLocationParamsRule parent;
             private readonly SemanticModel model;
+            private readonly DiagnosticLevel diagnosticLevel;
 
-            public Visitor(ExplicitValuesForLocationParamsRule parent, SemanticModel model)
+            public Visitor(ExplicitValuesForLocationParamsRule parent, SemanticModel model, DiagnosticLevel diagnosticLevel)
             {
                 this.parent = parent;
                 this.model = model;
+                this.diagnosticLevel = diagnosticLevel;
             }
 
             public override void VisitModuleDeclarationSyntax(ModuleDeclarationSyntax moduleDeclarationSyntax)
             {
-                // Check that explicit values passed in to any location-related parameters in a consumed module
+                // Check that explicit values are passed in to any location-related parameters in a consumed module
                 ImmutableArray<(string parameterName, SyntaxBase? actualValue)> locationParametersActualValues =
-                    parent.GetParameterValuesForModuleLocationParameters(moduleDeclarationSyntax, model, onlyParamsWithDefaultValues: true);
+                    parent.GetParameterValuesForModuleLocationParameters(_cachedParamsUsedInLocationPropsForFile, moduleDeclarationSyntax, model, onlyParamsWithDefaultValues: true);
 
                 // Show the error on the params key if it exists, otherwise on the module name
                 var moduleParamsPropertyObject = moduleDeclarationSyntax.TryGetBody()?
@@ -63,7 +67,8 @@ namespace Bicep.Core.Analyzers.Linter.Rules
                         // No value being passed in - this is a failure
                         string moduleName = moduleDeclarationSyntax.Name.IdentifierName;
                         diagnostics.Add(
-                            parent.CreateDiagnosticForSpan(errorSpan,
+                            parent.CreateDiagnosticForSpan(diagnosticLevel,
+                                errorSpan,
                                 String.Format(
                                     CoreResources.NoHardcodedLocation_ModuleLocationNeedsExplicitValue,
                                     parameterName,
