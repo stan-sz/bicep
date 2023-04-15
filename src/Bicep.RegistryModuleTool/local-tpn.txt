@@ -3361,6 +3361,8 @@ OTHER
 runtime.any.System.Collections 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -3443,6 +3445,8 @@ OTHER
 runtime.any.System.Reflection.Extensions 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -3477,6 +3481,8 @@ OTHER
 runtime.any.System.Runtime 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -3499,6 +3505,8 @@ OTHER
 runtime.any.System.Runtime.InteropServices 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -3509,6 +3517,8 @@ OTHER
 runtime.any.System.Text.Encoding 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -3531,6 +3541,8 @@ OTHER
 runtime.any.System.Threading.Tasks 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -3541,6 +3553,8 @@ OTHER
 runtime.any.System.Threading.Timer 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -3551,6 +3565,8 @@ OTHER
 runtime.debian.8-x64.runtime.native.System.Security.Cryptography.OpenSsl 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -3571,6 +3587,8 @@ OTHER
 runtime.fedora.24-x64.runtime.native.System.Security.Cryptography.OpenSsl 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -3625,6 +3643,8 @@ OTHER
 runtime.native.System.Security.Cryptography.OpenSsl 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -3635,6 +3655,8 @@ OTHER
 runtime.opensuse.13.2-x64.runtime.native.System.Security.Cryptography.OpenSsl 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -5967,6 +5989,7 @@ SOFTWARE.
 System.CommandLine 2.0.0-beta4.22272.1 - MIT
 
 
+(c) Microsoft Corporation
 
 MIT License
 
@@ -5985,6 +6008,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 System.CommandLine.Hosting 0.4.0-alpha.22272.1 - MIT
 
 
+(c) Microsoft Corporation
 
 MIT License
 
@@ -6003,6 +6027,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 System.CommandLine.NamingConventionBinder 2.0.0-beta4.22272.1 - MIT
 
 
+(c) Microsoft Corporation
 
 MIT License
 
@@ -6090,6 +6115,8 @@ OTHER
 runtime.ubuntu.14.04-x64.runtime.native.System.Security.Cryptography.OpenSsl 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -6112,6 +6139,8 @@ OTHER
 runtime.ubuntu.16.10-x64.runtime.native.System.Security.Cryptography.OpenSsl 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -6194,6 +6223,8 @@ OTHER
 runtime.unix.System.Private.Uri 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -6286,6 +6317,8 @@ OTHER
 runtime.win.System.IO.FileSystem 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -6296,6 +6329,8 @@ OTHER
 runtime.win.System.Net.Primitives 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -6306,6 +6341,8 @@ OTHER
 runtime.win.System.Net.Sockets 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -6340,6 +6377,8 @@ OTHER
 System.Buffers 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -6484,6 +6523,8 @@ OTHER
 System.IO.Compression.ZipFile 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -6506,7 +6547,7 @@ OTHER
 System.IO.FileSystem.Primitives 4.3.0 - OTHER
 
 
-(c) Microsoft Corporation.
+(c) Microsoft Corporation
 Copyright (c) .NET Foundation and Contributors
 
 OTHER
@@ -6602,6 +6643,8 @@ OTHER
 System.Private.Uri 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
@@ -7956,6 +7999,8 @@ OTHER
 System.Text.RegularExpressions 4.3.0 - OTHER
 
 
+(c) Microsoft Corporation
+Copyright (c) .NET Foundation and Contributors
 
 OTHER
 
